@@ -12,50 +12,36 @@
  limitations under the License.
 */
 
-package discover
+package mstream
 
 import (
 	"context"
 	"fmt"
+	"github.com/google/gopacket"
 	"net"
 	"time"
-
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-
-	"jinr.ru/greenlab/go-adc/pkg/log"
 )
-
-/*
- As defined by the IANA, the leftmost 24 bits of an IPv4 multicast
- MAC address are 0x01005E, the 25th bit is 0, and the rightmost 23
- bits are mapped to the rightmost 23 bits of a multicast IPv4 address.
- For example, if the IPv4 multicast address of a group is 224.0.1.1,
- the IPv4 multicast MAC address of this group is 01-00-5E-00-01-01.`
- */
-
 
 type Server struct {
 	context.Context
 	Address string
 	Port string
-	IfaceName string
-	*net.Interface
 	*net.UDPAddr
 	chCaptured chan Cap
+	chToSend chan Send
 }
 
-type Cap struct{
+type Cap struct {
 	Data []byte
 	gopacket.CaptureInfo
 }
 
 
-func NewServer(address, port, ifaceName string) (*Server, error) {
-	iface, err := net.InterfaceByName(ifaceName)
-	if err != nil {
-		return nil, err
-	}
+type Send struct {
+	Data []byte
+}
+
+func NewServer(address, port string) (*Server, error) {
 	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", address, port))
 	if err != nil {
 		return nil, err
@@ -65,11 +51,10 @@ func NewServer(address, port, ifaceName string) (*Server, error) {
 		Context: context.Background(),
 		Address: address,
 		Port: port,
-		IfaceName: ifaceName,
-		Interface: iface,
 		UDPAddr: uaddr,
 		chCaptured: make(chan Cap),
 	}
+
 	return s, nil
 }
 
@@ -82,7 +67,7 @@ func (s *Server) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err err
 
 func (s *Server) Run() error {
 
-	conn, err := net.ListenMulticastUDP("udp", s.Interface, s.UDPAddr)
+	conn, err := net.ListenUDP("udp", s.UDPAddr)
 	if err != nil {
 		return err
 	}
@@ -90,8 +75,9 @@ func (s *Server) Run() error {
 	defer conn.Close()
 
 	errChan := make(chan error, 1)
-	buffer := make([]byte, 2048)
+	buffer := make([]byte, 65536)
 
+	// receive data from the wire and put them to the handler channel
 	go func() {
 		for {
 			length, addr, err := conn.ReadFrom(buffer)
@@ -103,7 +89,6 @@ func (s *Server) Run() error {
 			ci := gopacket.CaptureInfo{
 				Length: length,
 				CaptureLength: length,
-				InterfaceIndex: s.Interface.Index,
 				Timestamp: time.Now(),
 				AncillaryData: []interface{}{addr},
 			}
@@ -112,20 +97,15 @@ func (s *Server) Run() error {
 		}
 	}()
 
-	go func() {
-		source := gopacket.NewPacketSource(s, layers.LayerTypeLinkLayerDiscovery)
-		for packet := range source.Packets() {
-			dd := &DeviceDescription{}
-			layer, ok := packet.Layer(layers.LayerTypeLinkLayerDiscoveryInfo).(*layers.LinkLayerDiscoveryInfo)
-			if !ok {
-				log.Info("Wrong discovery packet received. Can not parse.")
-				continue
-			}
-			decodeOrgSpecific(layer.OrgTLVs, dd)
-			fmt.Print(dd.String())
+	// read packets from the handler channel and handle them
+	//go func() {
+	//	source := gopacket.NewPacketSource(s, layers.LayerTypeLinkLayerDiscovery)
+	//	for packet := range source.Packets() {
+	//		// TODO
+	//	}
+	//}()
 
-		}
-	}()
+	// read packets for the packets channel and send them
 
 	select {
 	case <-s.Context.Done():
@@ -136,3 +116,14 @@ func (s *Server) Run() error {
 
 }
 
+
+//
+//func ConnectToHardware() error {
+//	info := &MLinkInfo{}
+//	info.FragmentID = -1
+//	info.FragmentOffset = -1
+//	info.Seq = 0
+//	info.Src = 1
+//	info.Dst = 0xfefe
+//	return SendAck(info)
+//}

@@ -14,13 +14,68 @@
 
 package config
 
+import (
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"gopkg.in/yaml.v2"
+)
+
 type DiscoverConfig struct {
 	Address string `json:"address,omitempty"`
+	Port string `json:"port,omitempty"`
+	Interface string `json:"interface"`
+}
+
+type MStreamConfig struct {
+	Address string `json:"address"`
 	Port string `json:"port,omitempty"`
 }
 
 type Config struct {
-	*DiscoverConfig `json:"discover"`
+	*DiscoverConfig `json:"discover,omitempty"`
+	*MStreamConfig `json:"mstream,omitempty"`
+	filepath string
+}
+
+func (c *Config) Persist(overwrite bool) error {
+	if _, err := os.Stat(c.filepath); err == nil && !overwrite {
+		return ErrConfigFileExists{Path: c.filepath}
+	}
+
+	data, err := yaml.Marshal(&c)
+	if err != nil {
+		return err
+	}
+
+	dir := filepath.Dir(c.filepath)
+	err = os.MkdirAll(dir, 0755)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(c.filepath, data, 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Config) LoadConfig() error {
+	data, err := ioutil.ReadFile(c.filepath)
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal(data, c)
+}
+
+func DefaultConfigPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = ""
+	}
+	return filepath.Join(home, ConfigDir, ConfigFile)
 }
 
 func NewDefaultConfig() *Config {
@@ -28,6 +83,14 @@ func NewDefaultConfig() *Config {
 		DiscoverConfig: &DiscoverConfig{
 			Address: DefaultDiscoverAddress,
 			Port: DefaultDiscoverPort,
+			Interface: DefaultDiscoverInterface,
 		},
+		MStreamConfig: &MStreamConfig{
+			Address: DefaultMStreamAddress,
+			Port: DefaultMStreamPort,
+		},
+		filepath: DefaultConfigPath(),
 	}
 }
+
+

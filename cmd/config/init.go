@@ -14,12 +14,20 @@
 
 package config
 
-const (
-	ConfigDir = ".go-adc"
-	ConfigFile = "config"
-	DefaultDiscoverAddress = "239.192.1.1"
-	DefaultDiscoverPort = "33303"
-	DefaultDiscoverInterface = "eth0"
-	DefaultMStreamAddress = "192.168.1.2"
-	DefaultMStreamPort = "33301"
+import (
+	"github.com/spf13/cobra"
+	"jinr.ru/greenlab/go-adc/pkg/config"
 )
+
+func NewInitCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:           "init",
+		Short:         "Create default config",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			config := config.NewDefaultConfig()
+			return config.Persist(false)
+		},
+	}
+
+	return cmd
+}

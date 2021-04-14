@@ -14,12 +14,15 @@
 
 package config
 
-const (
-	ConfigDir = ".go-adc"
-	ConfigFile = "config"
-	DefaultDiscoverAddress = "239.192.1.1"
-	DefaultDiscoverPort = "33303"
-	DefaultDiscoverInterface = "eth0"
-	DefaultMStreamAddress = "192.168.1.2"
-	DefaultMStreamPort = "33301"
+import (
+	"fmt"
 )
+
+// ErrConfigFileExists is returned when there is an existing file at specified location
+type ErrConfigFileExists struct {
+	Path string
+}
+
+func (e ErrConfigFileExists) Error() string {
+	return fmt.Sprintf("could not create default config at %s, file already exists", e.Path)
+}

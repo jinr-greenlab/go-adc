@@ -12,15 +12,11 @@
  limitations under the License.
 */
 
-package discover
+package mstream
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
-
-	"jinr.ru/greenlab/go-adc/pkg/config"
-	"jinr.ru/greenlab/go-adc/pkg/discover"
+	"jinr.ru/greenlab/go-adc/pkg/mstream"
 )
 
 const (
@@ -29,22 +25,21 @@ const (
 	IfaceNameOptionName = "iface-name"
 )
 
-func NewDiscoverCommand() *cobra.Command {
-	var address, port, ifaceName string
+func NewMStreamCommand() *cobra.Command {
+	var address, port string
 	cmd := &cobra.Command{
-		Use:           "discover",
-		Short:         "Start discover server",
+		Use:           "mstream",
+		Short:         "Start mstream server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			server, err := discover.NewServer(address, port, ifaceName)
+			server, err := mstream.NewServer(address, port)
 			if err != nil {
 				return err
 			}
 			return server.Run()
 		},
 	}
-	cmd.Flags().StringVar(&address, AddressOptionName, config.DefaultDiscoverAddress, fmt.Sprintf("Address to bind. E.g. %s", config.DefaultDiscoverAddress))
-	cmd.Flags().StringVar(&port, PortOptionName, config.DefaultDiscoverPort, fmt.Sprintf("Port number to bind. E.g. %s", config.DefaultDiscoverPort))
-	cmd.Flags().StringVar(&ifaceName, IfaceNameOptionName, "", "Interface name to listen on. E.g. eth0")
+	cmd.Flags().StringVar(&address, AddressOptionName, "", "Address to bind. E.g. 192.168.1.2")
+	cmd.Flags().StringVar(&port, PortOptionName, "33301", "Port number to bind. E.g. 33301")
 
 	return cmd
 }
