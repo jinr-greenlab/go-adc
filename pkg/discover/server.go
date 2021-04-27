@@ -23,6 +23,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 
+	"jinr.ru/greenlab/go-adc/pkg/common"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
@@ -42,14 +43,8 @@ type Server struct {
 	IfaceName string
 	*net.Interface
 	*net.UDPAddr
-	chCaptured chan Cap
+	chCaptured chan common.Captured
 }
-
-type Cap struct{
-	Data []byte
-	gopacket.CaptureInfo
-}
-
 
 func NewServer(address, port, ifaceName string) (*Server, error) {
 	iface, err := net.InterfaceByName(ifaceName)
@@ -68,7 +63,7 @@ func NewServer(address, port, ifaceName string) (*Server, error) {
 		IfaceName: ifaceName,
 		Interface: iface,
 		UDPAddr: uaddr,
-		chCaptured: make(chan Cap),
+		chCaptured: make(chan common.Captured),
 	}
 	return s, nil
 }
@@ -93,6 +88,21 @@ func (s *Server) Run() error {
 	buffer := make([]byte, 2048)
 
 	go func() {
+		source := gopacket.NewPacketSource(s, layers.LayerTypeLinkLayerDiscovery)
+		for packet := range source.Packets() {
+			dd := &DeviceDescription{}
+			layer, ok := packet.Layer(layers.LayerTypeLinkLayerDiscoveryInfo).(*layers.LinkLayerDiscoveryInfo)
+			if !ok {
+				log.Info("Wrong discovery packet received. Can not parse.")
+				continue
+			}
+			decodeOrgSpecific(layer.OrgTLVs, dd)
+			fmt.Print(dd.String())
+
+		}
+	}()
+
+	go func() {
 		for {
 			length, addr, err := conn.ReadFrom(buffer)
 			if err != nil {
@@ -108,22 +118,7 @@ func (s *Server) Run() error {
 				AncillaryData: []interface{}{addr},
 			}
 
-			s.chCaptured <- Cap{Data: buffer[:length], CaptureInfo: ci}
-		}
-	}()
-
-	go func() {
-		source := gopacket.NewPacketSource(s, layers.LayerTypeLinkLayerDiscovery)
-		for packet := range source.Packets() {
-			dd := &DeviceDescription{}
-			layer, ok := packet.Layer(layers.LayerTypeLinkLayerDiscoveryInfo).(*layers.LinkLayerDiscoveryInfo)
-			if !ok {
-				log.Info("Wrong discovery packet received. Can not parse.")
-				continue
-			}
-			decodeOrgSpecific(layer.OrgTLVs, dd)
-			fmt.Print(dd.String())
-
+			s.chCaptured <- common.Captured{Data: buffer[:length], CaptureInfo: ci}
 		}
 	}()
 

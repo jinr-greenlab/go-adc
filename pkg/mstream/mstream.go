@@ -25,24 +25,19 @@ import (
 const (
 	// MStreamLayerNum identifies the layer number
 	MStreamLayerNum = 1998
-	// MLinkType appears in the Type field of the MLink frame header and means the payload type
-	// which is aslways the same since we always deal with MStream data
-	// MLinkType = 0x5354
-
 )
 
 type MStreamHeader struct {
-	FragmentLen uint16
-	Subtype uint8
-	Flags uint8
 	DeviceID uint8 // it is always 0xd9 which corresponds to adc64ve-xge
-	FragmentID uint8
-	FragmentOffset uint32
+	Flags uint8
+	Subtype uint8
+	FragmentLength uint16
+	FragmentID uint16
+	FragmentOffset uint16
 	DeviceSerial uint32
 	UserDefBytes uint8
 	EventNum uint32
 }
-// TODO implement two additional methods for MStreamHeader GetFragmentID and GetFragmentOffset
 
 type MStreamLayer struct {
 	layers.BaseLayer
@@ -65,6 +60,7 @@ func (ms *MStreamLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Se
 func (ms *MStreamLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	if len(data) < 16 {
 		df.SetTruncated()
+		// TODO return custom error
 		return errors.New("MStream packet too short")
 	}
 
@@ -73,21 +69,33 @@ func (ms *MStreamLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback)
 		Payload: data[16:], // data without MStream header
 	}
 
-	ms.FragmentLen = binary.BigEndian.Uint16(data[0:2])
-	if ms.FragmentLen == 0 {
-		return errors.New("Invalid MStream header: FragmentLen = 0")
+	ms.FragmentLength = binary.BigEndian.Uint16(data[0:2])
+	if ms.FragmentLength == 0 {
+		return errors.New("Invalid MStream header: FragmentLength = 0")
 	}
 
 	ms.Subtype = data[2] & 0b00000011 // Subtype is two least significant bits
 	ms.Flags = (data[2] >> 2) & 0b00111111 // Flags is six high bits
 	ms.DeviceID = data[3]
-	ms.FragmentID = data[4]
-	ms.FragmentOffset = binary.BigEndian.Uint32(data[5:8])
+	ms.FragmentID = binary.BigEndian.Uint16(data[4:6]) // FragmentID takes 2 bytes for MStream 2.x
+	ms.FragmentOffset = binary.BigEndian.Uint16(data[6:8]) // FragmentOffset takes 2 bytes for MStream 2.x
 	ms.DeviceSerial = binary.BigEndian.Uint32(data[8:12])
 	ms.UserDefBytes = data[12]
 	ms.EventNum = binary.BigEndian.Uint32(data[13:16])
 
 	return nil
+}
+
+func (ms *MStreamLayer) LastFragment() bool {
+	return ((ms.Flags >> 5) & 0b00000001) == 1
+}
+
+func (ms *MStreamLayer) SetLastFragment(last bool) {
+	if last {
+		ms.Flags |= 0b00100000
+	} else {
+		ms.Flags &= 0b11011111
+	}
 }
 
 func decodeMStreamLayer(data []byte, p gopacket.PacketBuilder) error {

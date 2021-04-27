@@ -17,9 +17,13 @@ package mstream
 import (
 	"context"
 	"fmt"
-	"github.com/google/gopacket"
 	"net"
 	"time"
+
+	"github.com/google/gopacket"
+
+	"jinr.ru/greenlab/go-adc/pkg/common"
+	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
 type Server struct {
@@ -27,15 +31,9 @@ type Server struct {
 	Address string
 	Port string
 	*net.UDPAddr
-	chCaptured chan Cap
+	chCaptured chan common.Captured
 	chToSend chan Send
 }
-
-type Cap struct {
-	Data []byte
-	gopacket.CaptureInfo
-}
-
 
 type Send struct {
 	Data []byte
@@ -52,7 +50,7 @@ func NewServer(address, port string) (*Server, error) {
 		Address: address,
 		Port: port,
 		UDPAddr: uaddr,
-		chCaptured: make(chan Cap),
+		chCaptured: make(chan common.Captured),
 	}
 
 	return s, nil
@@ -77,6 +75,29 @@ func (s *Server) Run() error {
 	errChan := make(chan error, 1)
 	buffer := make([]byte, 65536)
 
+	// read packets from the handler channel and handle them
+	go func() {
+		source := gopacket.NewPacketSource(s, MLinkLayerType)
+		defragmenter := NewMStreamDefragmenter()
+		for packet := range source.Packets() {
+			ml, ok := packet.Layer(MLinkLayerType).(*MLinkLayer)
+			if !ok {
+				log.Error("Error while parsing MLink layer")
+			}
+			ms, ok := packet.Layer(MStreamLayerType).(*MStreamLayer)
+			if !ok {
+				log.Error("Error while parsing MStream layer")
+			}
+			out, err := defragmenter.Defrag(ms, ml)
+			if err != nil {
+				log.Error("Error while trying to defragment MStream frame")
+			} else if out == nil {
+				// this was MStream fragment, we don't have full frame yet, do nothing
+				continue
+			}
+		}
+	}()
+
 	// receive data from the wire and put them to the handler channel
 	go func() {
 		for {
@@ -93,20 +114,11 @@ func (s *Server) Run() error {
 				AncillaryData: []interface{}{addr},
 			}
 
-			s.chCaptured <- Cap{Data: buffer[:length], CaptureInfo: ci}
+			s.chCaptured <- common.Captured{Data: buffer[:length], CaptureInfo: ci}
 		}
 	}()
 
-	// read packets from the handler channel and handle them
-	//go func() {
-	//	source := gopacket.NewPacketSource(s, layers.LayerTypeLinkLayerDiscovery)
-	//	for packet := range source.Packets() {
-	//		// TODO
-	//	}
-	//}()
-
 	// read packets for the packets channel and send them
-
 	select {
 	case <-s.Context.Done():
 		return s.Context.Err()
@@ -117,7 +129,7 @@ func (s *Server) Run() error {
 }
 
 
-//
+
 //func ConnectToHardware() error {
 //	info := &MLinkInfo{}
 //	info.FragmentID = -1

@@ -21,15 +21,58 @@ import (
 	"os"
 )
 
-var (
-	goADCLog = log.New(os.Stderr, "[go-adc] ", log.LstdFlags | log.Llongfile)
+type LogLevel int
+
+const (
+	LogPrefix = "[go-adc] "
+	ErrorPrefix = "[error] "
+	WarningPrefix = "[warn] "
+	InfoPrefix = "[info] "
+	DebugPrefix = "[debug] "
+	DefaultLogLevel = InfoLevel
 )
 
+const (
+	ErrorLevel LogLevel = iota
+	WarningLevel
+	InfoLevel
+	DebugLevel
+)
+
+type Logger struct {
+	level LogLevel
+	*log.Logger
+}
+
+var	logger = &Logger{
+	level:  DefaultLogLevel,
+	Logger: log.New(os.Stderr, LogPrefix, log.LstdFlags|log.Llongfile),
+}
+
 func Init(out io.Writer) {
-	goADCLog.SetOutput(out)
+	logger.SetOutput(out)
+}
+
+func Error(format string, v ...interface{}) {
+	if logger.level >= ErrorLevel {
+		logger.Println(fmt.Sprintf(ErrorPrefix + format, v...))
+	}
+}
+
+func Warning(format string, v ...interface{}) {
+	if logger.level >= WarningLevel {
+		logger.Println(fmt.Sprintf(WarningPrefix + format, v...))
+	}
 }
 
 func Info(format string, v ...interface{}) {
-	goADCLog.Print(fmt.Sprintf(format, v...))
+	if logger.level >= InfoLevel {
+		logger.Println(fmt.Sprintf(InfoPrefix + format, v...))
+	}
 }
 
+func Debug(format string, v ...interface{}) {
+	if logger.level >= DebugLevel {
+		logger.Println(fmt.Sprintf(DebugPrefix + format, v...))
+	}
+}
