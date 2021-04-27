@@ -136,13 +136,13 @@ func (fl *fragmentList) assemble(ms *MStreamLayer) (*MStreamLayer, error) {
 // plus FragmentID which is the same for all fragments within a MStream frame
 // and different for different MStream frames.
 type fragmentListKey struct {
-	MLinkFlow gopacket.Flow
+	*gopacket.Flow
 	FragmentID uint16
 }
 
-func newFragmentListKey(ms *MStreamLayer, ml *MLinkLayer) fragmentListKey {
+func newFragmentListKey(ms *MStreamLayer, flow *gopacket.Flow) fragmentListKey {
 	return fragmentListKey{
-		MLinkFlow: ml.Flow(),
+		Flow: flow,
 		FragmentID: ms.FragmentID,
 	}
 }
@@ -156,11 +156,11 @@ type MStreamDefragmenter struct {
 	fragments map[fragmentListKey]*fragmentList
 }
 
-func (md *MStreamDefragmenter) Defrag(ms *MStreamLayer, ml *MLinkLayer) (*MStreamLayer, error) {
+func (md *MStreamDefragmenter) Defrag(ms *MStreamLayer, flow *gopacket.Flow) (*MStreamLayer, error) {
 	log.Debug("defrag: got a new fragment FragmentID: %d FragmentOffset: %d LastFragment: %t",
 		ms.FragmentID, ms.FragmentOffset, ms.LastFragment())
 
-	key := newFragmentListKey(ms, ml)
+	key := newFragmentListKey(ms, flow)
 	var fl *fragmentList
 	md.Lock()
 	fl, ok := md.fragments[key]
