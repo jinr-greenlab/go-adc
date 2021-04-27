@@ -36,6 +36,7 @@ const (
 	// MLinkSync is a magic number that appears in the beginning of each MLink frame
 	MLinkSync = 0x2A50
 	// MLink is the last word of each MLink frame, they call it MLINK_DATA_PADDING_MAGIC or CRC
+	// For ACK frames it is just 0x00000000
 	MLinkCRC = 0x12206249
 )
 
@@ -44,6 +45,8 @@ type MLinkType uint16
 const (
 	// TODO add other MLink types once they are implemented
 	MLinkTypeMStream MLinkType = 0x5354
+	MLinkTypeRegisterRWRequest MLinkType = 0x0101
+	MLinkTypeRegisterRWResponse MLinkType = 0x0102
 )
 
 type errorDecoderForMLinkType int
@@ -90,8 +93,8 @@ func (t MLinkType) String() string {
 }
 
 type MLinkHeader struct {
-	Sync uint16
 	Type MLinkType
+	Sync uint16
 	Seq uint16
 	Len uint16
 	Src uint16
@@ -101,6 +104,7 @@ type MLinkHeader struct {
 type MLinkLayer struct {
 	layers.BaseLayer
 	MLinkHeader
+	Crc uint32
 }
 
 var MLinkLayerType = gopacket.RegisterLayerType(MLinkLayerNum,
@@ -117,8 +121,8 @@ func (ml *MLinkLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Seri
 		return err
 	}
 
-	binary.BigEndian.PutUint16(headerBytes[0:2], ml.Sync)
-	binary.BigEndian.PutUint16(headerBytes[2:4], uint16(ml.Type))
+	binary.BigEndian.PutUint16(headerBytes[0:2], uint16(ml.Type))
+	binary.BigEndian.PutUint16(headerBytes[2:4], ml.Sync)
 	binary.BigEndian.PutUint16(headerBytes[4:6], ml.Seq)
 	binary.BigEndian.PutUint16(headerBytes[6:8], ml.Len)
 	binary.BigEndian.PutUint16(headerBytes[8:10], ml.Src)
@@ -128,7 +132,7 @@ func (ml *MLinkLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Seri
 	if err != nil {
 		return err
 	}
-	binary.BigEndian.PutUint32(tailBytes[0:4], MLinkCRC)
+	binary.BigEndian.PutUint32(tailBytes[0:4], ml.Crc)
 	return nil
 }
 
@@ -139,7 +143,7 @@ func (ml *MLinkLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) e
 		return errors.New("MLink packet too short")
 	}
 
-	if binary.BigEndian.Uint16(data[0:2]) != MLinkSync {
+	if binary.BigEndian.Uint16(data[2:4]) != MLinkSync {
 		return errors.New(fmt.Sprintf("Wrong MLink sync. Must be %d", MLinkSync))
 	}
 
@@ -152,8 +156,8 @@ func (ml *MLinkLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) e
 		Payload: data[12:len(data)-4], // data without MLink header and without CRC in the end of each MLink frame
 	}
 
-	ml.Sync = binary.BigEndian.Uint16(data[0:2])
-	ml.Type = MLinkType(binary.BigEndian.Uint16(data[2:4]))
+	ml.Type = MLinkType(binary.BigEndian.Uint16(data[0:2]))
+	ml.Sync = binary.BigEndian.Uint16(data[2:4])
 	ml.Seq = binary.BigEndian.Uint16(data[4:6])
 	ml.Len = binary.BigEndian.Uint16(data[6:8])
 	ml.Src = binary.BigEndian.Uint16(data[8:10])
@@ -175,17 +179,3 @@ func decodeMLinkLayer(data []byte, p gopacket.PacketBuilder) error {
 	p.AddLayer(ml)
 	return p.NextDecoder(ml.NextLayerType())
 }
-
-func (ml *MLinkLayer) Flow() gopacket.Flow {
-	src := make([]byte, 2)
-	dst := make([]byte, 2)
-	binary.BigEndian.PutUint16(src, ml.Src)
-	binary.BigEndian.PutUint16(dst, ml.Dst)
-	return gopacket.NewFlow(EndpointMLink, src, dst)
-}
-
-var (
-	EndpointMLink = gopacket.RegisterEndpointType(MLinkEndpointNum, gopacket.EndpointTypeMetadata{Name: "MLink", Formatter: func(b []byte) string {
-		return string(b)
-	}})
-)
