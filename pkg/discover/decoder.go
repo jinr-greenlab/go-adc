@@ -15,9 +15,10 @@
 package discover
 
 import (
-	"fmt"
 	"encoding/binary"
+	"fmt"
 	"github.com/google/gopacket/layers"
+	"net"
 	"sigs.k8s.io/yaml"
 
 	"jinr.ru/greenlab/go-adc/pkg/log"
@@ -43,39 +44,46 @@ const (
 )
 
 type Flags struct {
-	MasterLocked uint8 `json:"MasterLocked,omitempty"`
-	MStreamLocked uint8 `json:"MStreamLocked,omitempty"`
-	Unused uint8 `json:"Unused,omitempty"`
+	MasterLocked uint8 `json:"masterLocked"`
+	MStreamLocked uint8 `json:"mstreamLocked"`
+	Unused uint8 `json:"unused"`
+}
+
+type Mac struct {
+	net.HardwareAddr
+}
+
+func (m *Mac) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"%s\"", m.String())), nil
 }
 
 type DeviceDescription struct {
-	DeviceID uint16 `json:"DeviceID,omitempty"`
-	SerialID uint64 `json:"SerialID,omitempty"`
-	ChassisSlot uint16 `json:"ChassisSlot,omitempty"`
-	MasterMac uint64 `json:"MasterMac,omitempty"`
-	MasterIP uint32 `json:"MasterIP,omitempty"`
-	MasterUDPPort uint16 `json:"MasterUDPPort,omitempty"`
-	MStreamMac uint64 `json:"MStreamMac,omitempty"`
-	MStreamIP uint32 `json:"MStreamIP,omitempty"`
-	MStreamUDPPort uint16 `json:"MStreamUDPPort,omitempty"`
-	Flags `json:"Flags,omitempty"`
+	DeviceID uint16 `json:"deviceID,omitempty"`
+	SerialID uint64 `json:"serialID,omitempty"`
+	ChassisSlot uint16 `json:"chassisSlot,omitempty"`
+	MasterMac Mac `json:"masterMac,omitempty"`
+	MasterIP net.IP `json:"masterIP,omitempty"`
+	MasterUDPPort uint16 `json:"masterUDPPort,omitempty"`
+	MStreamMac Mac `json:"mstreamMac,omitempty"`
+	MStreamIP net.IP `json:"mstreamIP,omitempty"`
+	MStreamUDPPort uint16 `json:"mstreamUDPPort,omitempty"`
+	Flags `json:"flags,omitempty"`
 
-	HardwareRevision string `json:"HardwareRevision,omitempty"`
-	FirmwareRevision string `json:"FirmwareRevision,omitempty"`
-	SerialNumber string `json:"SerialNumber,omitempty"`
-	ManufacturerName string `json:"ManufacturerName,omitempty"`
-	ModelName string `json:"ModelName,omitempty"`
+	HardwareRevision string `json:"hardwareRevision,omitempty"`
+	FirmwareRevision string `json:"firmwareRevision,omitempty"`
+	SerialNumber string `json:"serialNumber,omitempty"`
+	ManufacturerName string `json:"manufacturerName,omitempty"`
+	ModelName string `json:"modelName,omitempty"`
 }
 
 func (dd *DeviceDescription) String() string {
 	result, err := yaml.Marshal(dd)
 	if err != nil {
-		log.Info("Error occured while marshaling device description, %s", err)
+		log.Error("Error occured while marshaling device description, %s", err)
 		return ""
 	}
 	return fmt.Sprintf("---\n%s", string(result))
 }
-
 
 func streatchByteSlice(orig []byte, upToLength int) []byte {
 	result := make([]byte, upToLength)
@@ -115,15 +123,15 @@ func decodeAfi(tlv layers.LLDPOrgSpecificTLV, dd *DeviceDescription) {
 		if len(tlv.Info) < 25 {
 			break
 		}
-		dd.MasterMac = binary.BigEndian.Uint64(streatchByteSlice(tlv.Info[:6], 8))
-		dd.MasterIP = binary.BigEndian.Uint32(tlv.Info[6:10])
+		dd.MasterMac = Mac{HardwareAddr: tlv.Info[:6]}
+		dd.MasterIP = net.IPv4(tlv.Info[6], tlv.Info[7], tlv.Info[8], tlv.Info[9])
 		dd.MasterUDPPort = binary.BigEndian.Uint16(tlv.Info[10:12])
-		dd.MStreamMac = binary.BigEndian.Uint64(streatchByteSlice(tlv.Info[12:18], 8))
-		dd.MStreamIP = binary.BigEndian.Uint32(tlv.Info[18:22])
+		dd.MStreamMac = Mac{HardwareAddr: tlv.Info[12:18]}
+		dd.MStreamIP = net.IPv4(tlv.Info[18], tlv.Info[19], tlv.Info[20], tlv.Info[21])
 		dd.MStreamUDPPort = binary.BigEndian.Uint16(tlv.Info[22:24])
-		dd.Flags.MasterLocked = 0b10000000 & tlv.Info[24]
-		dd.Flags.MStreamLocked = 0b01000000 & tlv.Info[24]
-		dd.Flags.Unused = 0b00111111 & tlv.Info[24]
+		dd.Flags.MasterLocked = 0b00000001 & tlv.Info[24]
+		dd.Flags.MStreamLocked = (0b00000010 & tlv.Info[24]) >> 1
+		dd.Flags.Unused = (0b11111100 & tlv.Info[24]) >> 2
 	}
 }
 
