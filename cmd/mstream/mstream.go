@@ -16,22 +16,32 @@ package mstream
 
 import (
 	"github.com/spf13/cobra"
+	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/mstream"
 )
 
 const (
 	AddressOptionName = "address"
 	PortOptionName = "port"
-	IfaceNameOptionName = "iface-name"
 )
 
 func NewMStreamCommand() *cobra.Command {
 	var address, port string
+	cfg := config.NewDefaultConfig()
+	cfg.LoadConfig()
+	mstreamConfig := cfg.MStreamConfig
 	cmd := &cobra.Command{
 		Use:           "mstream",
 		Short:         "Start mstream server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			server, err := mstream.NewServer(address, port)
+			if address != "" {
+				mstreamConfig.Address = address
+			}
+			if port != "" {
+				mstreamConfig.Port = port
+			}
+
+			server, err := mstream.NewServer(mstreamConfig)
 			if err != nil {
 				return err
 			}
@@ -39,7 +49,7 @@ func NewMStreamCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&address, AddressOptionName, "", "Address to bind. E.g. 192.168.1.2")
-	cmd.Flags().StringVar(&port, PortOptionName, "33301", "Port number to bind. E.g. 33301")
+	cmd.Flags().StringVar(&port, PortOptionName, "", "Port number to bind. E.g. 33301")
 
 	return cmd
 }

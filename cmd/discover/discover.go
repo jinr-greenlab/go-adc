@@ -31,19 +31,31 @@ const (
 
 func NewDiscoverCommand() *cobra.Command {
 	var address, port, ifaceName string
+	cfg := config.NewDefaultConfig()
+	cfg.LoadConfig()
+	discoverConfig := cfg.DiscoverConfig
 	cmd := &cobra.Command{
 		Use:           "discover",
 		Short:         "Start discover server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			server, err := discover.NewServer(address, port, ifaceName)
+			if address != "" {
+				discoverConfig.Address = address
+			}
+			if port != "" {
+				discoverConfig.Port = port
+			}
+			if ifaceName != "" {
+				discoverConfig.Interface = ifaceName
+			}
+			server, err := discover.NewServer(discoverConfig)
 			if err != nil {
 				return err
 			}
 			return server.Run()
 		},
 	}
-	cmd.Flags().StringVar(&address, AddressOptionName, config.DefaultDiscoverAddress, fmt.Sprintf("Address to bind. E.g. %s", config.DefaultDiscoverAddress))
-	cmd.Flags().StringVar(&port, PortOptionName, config.DefaultDiscoverPort, fmt.Sprintf("Port number to bind. E.g. %s", config.DefaultDiscoverPort))
+	cmd.Flags().StringVar(&address, AddressOptionName, "", fmt.Sprintf("Address to bind. E.g. %s", config.DefaultDiscoverAddress))
+	cmd.Flags().StringVar(&port, PortOptionName, "", fmt.Sprintf("Port number to bind. E.g. %s", config.DefaultDiscoverPort))
 	cmd.Flags().StringVar(&ifaceName, IfaceNameOptionName, "", "Interface name to listen on. E.g. eth0")
 
 	return cmd
