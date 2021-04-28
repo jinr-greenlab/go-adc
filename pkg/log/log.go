@@ -29,7 +29,7 @@ const (
 	WarningPrefix = "[warn] "
 	InfoPrefix = "[info] "
 	DebugPrefix = "[debug] "
-	DefaultLogLevel = InfoLevel
+	DefaultLogLevel = DebugLevel
 )
 
 const (
