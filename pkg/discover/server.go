@@ -17,6 +17,7 @@ package discover
 import (
 	"context"
 	"fmt"
+	"jinr.ru/greenlab/go-adc/pkg/config"
 	"net"
 	"time"
 
@@ -38,29 +39,28 @@ import (
 
 type Server struct {
 	context.Context
-	Address string
-	Port string
-	IfaceName string
+	*config.DiscoverConfig
 	*net.Interface
 	*net.UDPAddr
 	chCaptured chan common.Captured
 }
 
-func NewServer(address, port, ifaceName string) (*Server, error) {
-	iface, err := net.InterfaceByName(ifaceName)
+func NewServer(cfg *config.DiscoverConfig) (*Server, error) {
+	log.Debug("Initializing discover server with address: %s port: %s iface: %s",
+		cfg.Address, cfg.Port, cfg.Interface)
+
+	iface, err := net.InterfaceByName(cfg.Interface)
 	if err != nil {
 		return nil, err
 	}
-	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", address, port))
+	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", cfg.Address, cfg.Port))
 	if err != nil {
 		return nil, err
 	}
 
 	s := &Server{
 		Context: context.Background(),
-		Address: address,
-		Port: port,
-		IfaceName: ifaceName,
+		DiscoverConfig: cfg,
 		Interface: iface,
 		UDPAddr: uaddr,
 		chCaptured: make(chan common.Captured),
@@ -90,15 +90,17 @@ func (s *Server) Run() error {
 	go func() {
 		source := gopacket.NewPacketSource(s, layers.LayerTypeLinkLayerDiscovery)
 		for packet := range source.Packets() {
-			dd := &DeviceDescription{}
-			layer, ok := packet.Layer(layers.LayerTypeLinkLayerDiscoveryInfo).(*layers.LinkLayerDiscoveryInfo)
-			if !ok {
-				log.Info("Wrong discovery packet received. Can not parse.")
-				continue
+			layer := packet.Layer(layers.LayerTypeLinkLayerDiscoveryInfo)
+			if layer != nil {
+				layer, ok := layer.(*layers.LinkLayerDiscoveryInfo)
+				if !ok {
+					log.Error("Error while asserting to LinkLayerDiscoveryInfo")
+					continue
+				}
+				dd := &DeviceDescription{}
+				decodeOrgSpecific(layer.OrgTLVs, dd)
+				fmt.Print(dd.String())
 			}
-			decodeOrgSpecific(layer.OrgTLVs, dd)
-			fmt.Print(dd.String())
-
 		}
 	}()
 
