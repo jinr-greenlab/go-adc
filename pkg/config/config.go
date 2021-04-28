@@ -15,10 +15,10 @@
 package config
 
 import (
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"gopkg.in/yaml.v2"
 )
 
 type DiscoverConfig struct {
@@ -27,9 +27,15 @@ type DiscoverConfig struct {
 	Interface string `json:"interface"`
 }
 
-type MStreamConfig struct {
-	Address string `json:"address"`
+type MStreamPeer struct {
+	Address string `json:"address,omitempty"`
 	Port string `json:"port,omitempty"`
+}
+
+type MStreamConfig struct {
+	Address string `json:"address,omitempty"`
+	Port string `json:"port,omitempty"`
+	Peers []*MStreamPeer `json:"peers"`
 }
 
 type Config struct {
@@ -88,6 +94,7 @@ func NewDefaultConfig() *Config {
 		MStreamConfig: &MStreamConfig{
 			Address: DefaultMStreamAddress,
 			Port: DefaultMStreamPort,
+			Peers: []*MStreamPeer{},
 		},
 		filepath: DefaultConfigPath(),
 	}
