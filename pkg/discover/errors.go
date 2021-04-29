@@ -12,16 +12,17 @@
  limitations under the License.
 */
 
-package config
+package discover
 
-const (
-	ConfigDir = ".go-adc"
-	ConfigFile = "config"
-	DefaultDiscoverAddress = "239.192.1.1"
-	DefaultDiscoverPort = "33303"
-	DefaultDiscoverInterface = "eth0"
-	DefaultMStreamAddress = "192.168.2.100"
-	DefaultMStreamPort = "33301"
-	DefaultMStreamPeerAddress = "192.168.2.101"
-	DefaultMStreamPeerPort = "33301"
+import (
+	"fmt"
 )
+
+// ErrGetAddr returned when we can not get the address and port of the devices that sent discovery message
+type ErrGetAddr struct {
+	*DeviceDescription
+}
+
+func (e ErrGetAddr) Error() string {
+	return fmt.Sprintf("Error while getting device address and port: %s", e.DeviceDescription.SerialNumber)
+}

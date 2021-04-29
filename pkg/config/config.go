@@ -94,7 +94,12 @@ func NewDefaultConfig() *Config {
 		MStreamConfig: &MStreamConfig{
 			Address: DefaultMStreamAddress,
 			Port: DefaultMStreamPort,
-			Peers: []*MStreamPeer{},
+			Peers: []*MStreamPeer{
+				{
+					Address: DefaultMStreamPeerAddress,
+					Port: DefaultMStreamPeerPort,
+				},
+			},
 		},
 		filepath: DefaultConfigPath(),
 	}
