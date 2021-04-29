@@ -74,6 +74,8 @@ type DeviceDescription struct {
 	SerialNumber string `json:"serialNumber,omitempty"`
 	ManufacturerName string `json:"manufacturerName,omitempty"`
 	ModelName string `json:"modelName,omitempty"`
+	Address net.IP `json:"address,omitempty"`
+	Port uint16 `json:"port,omitempty"`
 }
 
 func (dd *DeviceDescription) String() string {

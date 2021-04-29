@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"net"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/gopacket"
@@ -35,7 +37,6 @@ import (
  For example, if the IPv4 multicast address of a group is 224.0.1.1,
  the IPv4 multicast MAC address of this group is 01-00-5E-00-01-01.`
  */
-
 
 type Server struct {
 	context.Context
@@ -68,6 +69,8 @@ func NewServer(cfg *config.DiscoverConfig) (*Server, error) {
 	return s, nil
 }
 
+// ReadPacketData reads chCaptured channel and returns packet data and metadata.
+// This method is from PacketDataSource interface.
 func (s *Server) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error) {
 	captured := <-s.chCaptured
 	data = captured.Data
@@ -87,6 +90,8 @@ func (s *Server) Run() error {
 	errChan := make(chan error, 1)
 	buffer := make([]byte, 2048)
 
+	// read packets from the chCaptured channel using the ReadPacketData method and parse them
+	// into DeviceDescription struct
 	go func() {
 		source := gopacket.NewPacketSource(s, layers.LayerTypeLinkLayerDiscovery)
 		for packet := range source.Packets() {
@@ -99,16 +104,18 @@ func (s *Server) Run() error {
 				}
 				dd := &DeviceDescription{}
 				decodeOrgSpecific(layer.OrgTLVs, dd)
+				getAddrPort(packet, dd)
 				fmt.Print(dd.String())
 			}
 		}
 	}()
 
+	// capture discovery packets from the wire and put them into the chCaptured channel
 	go func() {
 		for {
-			length, addr, err := conn.ReadFrom(buffer)
-			if err != nil {
-				errChan <- err
+			length, addr, captureErr := conn.ReadFrom(buffer)
+			if captureErr != nil {
+				errChan <- captureErr
 				return
 			}
 
@@ -133,3 +140,22 @@ func (s *Server) Run() error {
 
 }
 
+// getAddrPort uses packet metadata to get the IP address and port number of the device
+// that send the discovery message and sets Address and Port fields of the DeviceDescription struct
+func getAddrPort(packet gopacket.Packet, dd *DeviceDescription) error {
+	meta := packet.Metadata()
+	if len(meta.CaptureInfo.AncillaryData) >= 1 {
+		ansilliary := meta.CaptureInfo.AncillaryData[0]
+		addr, ok := ansilliary.(net.Addr)
+		if !ok {
+			return ErrGetAddr{DeviceDescription: dd}
+		}
+		splitted := strings.Split(addr.String(), ":")
+		dd.Address = net.ParseIP(splitted[0])
+		convertedPort, err := strconv.Atoi(splitted[1])
+		if err == nil {
+			dd.Port = uint16(convertedPort)
+		}
+	}
+	return nil
+}
