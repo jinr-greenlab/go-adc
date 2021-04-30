@@ -17,8 +17,9 @@ package discover
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/google/gopacket/layers"
 	"net"
+
+	"github.com/google/gopacket/layers"
 	"sigs.k8s.io/yaml"
 
 	"jinr.ru/greenlab/go-adc/pkg/log"
@@ -61,12 +62,12 @@ type DeviceDescription struct {
 	DeviceID uint16 `json:"deviceID,omitempty"`
 	SerialID uint64 `json:"serialID,omitempty"`
 	ChassisSlot uint16 `json:"chassisSlot,omitempty"`
-	MasterMac Mac `json:"masterMac,omitempty"`
-	MasterIP net.IP `json:"masterIP,omitempty"`
-	MasterUDPPort uint16 `json:"masterUDPPort,omitempty"`
-	MStreamMac Mac `json:"mstreamMac,omitempty"`
-	MStreamIP net.IP `json:"mstreamIP,omitempty"`
-	MStreamUDPPort uint16 `json:"mstreamUDPPort,omitempty"`
+	MasterMac Mac `json:"masterMac"`
+	MasterIP net.IP `json:"masterIP"`
+	MasterUDPPort uint16 `json:"masterUDPPort"`
+	MStreamMac Mac `json:"mstreamMac"`
+	MStreamIP net.IP `json:"mstreamIP"`
+	MStreamUDPPort uint16 `json:"mstreamUDPPort"`
 	Flags `json:"flags,omitempty"`
 
 	HardwareRevision string `json:"hardwareRevision,omitempty"`

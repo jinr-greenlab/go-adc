@@ -16,9 +16,7 @@ package discover
 
 import (
 	"fmt"
-
 	"github.com/spf13/cobra"
-
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/discover"
 )
@@ -32,7 +30,7 @@ const (
 func NewDiscoverCommand() *cobra.Command {
 	var address, port, ifaceName string
 	cfg := config.NewDefaultConfig()
-	cfg.LoadConfig()
+	cfg.Load()
 	discoverConfig := cfg.DiscoverConfig
 	cmd := &cobra.Command{
 		Use:           "discover",

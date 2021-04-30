@@ -15,10 +15,10 @@
 package config
 
 import (
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sigs.k8s.io/yaml"
 )
 
 type DiscoverConfig struct {
@@ -68,7 +68,7 @@ func (c *Config) Persist(overwrite bool) error {
 	return nil
 }
 
-func (c *Config) LoadConfig() error {
+func (c *Config) Load() error {
 	data, err := ioutil.ReadFile(c.filepath)
 	if err != nil {
 		return err

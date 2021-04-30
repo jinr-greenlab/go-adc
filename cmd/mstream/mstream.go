@@ -28,7 +28,7 @@ const (
 func NewMStreamCommand() *cobra.Command {
 	var address, port string
 	cfg := config.NewDefaultConfig()
-	cfg.LoadConfig()
+	cfg.Load()
 	mstreamConfig := cfg.MStreamConfig
 	cmd := &cobra.Command{
 		Use:           "mstream",
