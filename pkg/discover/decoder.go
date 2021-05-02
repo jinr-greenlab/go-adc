@@ -18,6 +18,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"strconv"
+	"strings"
 
 	"github.com/google/gopacket/layers"
 	"sigs.k8s.io/yaml"
@@ -75,8 +77,19 @@ type DeviceDescription struct {
 	SerialNumber string `json:"serialNumber,omitempty"`
 	ManufacturerName string `json:"manufacturerName,omitempty"`
 	ModelName string `json:"modelName,omitempty"`
-	Address net.IP `json:"address,omitempty"`
-	Port uint16 `json:"port,omitempty"`
+	Address net.IP `json:"address"`
+	Port uint16 `json:"port"`
+}
+
+func (dd *DeviceDescription) SetPeer(udpAddr *net.UDPAddr) error {
+	splitted := strings.Split(udpAddr.String(), ":")
+	dd.Address = net.ParseIP(splitted[0])
+	convertedPort, err := strconv.Atoi(splitted[1])
+	if err != nil {
+		return err
+	}
+	dd.Port = uint16(convertedPort)
+	return nil
 }
 
 func (dd *DeviceDescription) String() string {

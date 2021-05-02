@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"net"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/gopacket"
@@ -47,14 +45,14 @@ type Server struct {
 }
 
 func NewServer(cfg *config.DiscoverConfig) (*Server, error) {
-	log.Debug("Initializing discover server with address: %s port: %s iface: %s",
+	log.Debug("Initializing discover server with address: %s port: %d iface: %s",
 		cfg.Address, cfg.Port, cfg.Interface)
 
 	iface, err := net.InterfaceByName(cfg.Interface)
 	if err != nil {
 		return nil, err
 	}
-	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", cfg.Address, cfg.Port))
+	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", cfg.Address, cfg.Port))
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +102,12 @@ func (s *Server) Run() error {
 				}
 				dd := &DeviceDescription{}
 				decodeOrgSpecific(layer.OrgTLVs, dd)
-				getAddrPort(packet, dd)
+				peerUDPAddr, handleErr := common.GetAddrPort(packet)
+				if handleErr != nil {
+					// TODO
+					continue
+				}
+				dd.SetPeer(peerUDPAddr)
 				fmt.Print(dd.String())
 			}
 		}
@@ -140,22 +143,3 @@ func (s *Server) Run() error {
 
 }
 
-// getAddrPort uses packet metadata to get the IP address and port number of the device
-// that send the discovery message and sets Address and Port fields of the DeviceDescription struct
-func getAddrPort(packet gopacket.Packet, dd *DeviceDescription) error {
-	meta := packet.Metadata()
-	if len(meta.CaptureInfo.AncillaryData) >= 1 {
-		ansilliary := meta.CaptureInfo.AncillaryData[0]
-		addr, ok := ansilliary.(net.Addr)
-		if !ok {
-			return ErrGetAddr{DeviceDescription: dd}
-		}
-		splitted := strings.Split(addr.String(), ":")
-		dd.Address = net.ParseIP(splitted[0])
-		convertedPort, err := strconv.Atoi(splitted[1])
-		if err == nil {
-			dd.Port = uint16(convertedPort)
-		}
-	}
-	return nil
-}

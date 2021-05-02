@@ -12,7 +12,7 @@
  limitations under the License.
 */
 
-package mstream
+package mlink
 
 import (
 	"encoding/binary"
@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"jinr.ru/greenlab/go-adc/pkg/mstream"
 )
 
 
@@ -74,7 +75,7 @@ func initUnknownMLinkTypes() {
 
 func initActualMLinkTypes() {
 	// TODO init other MLink types once they are implemented
-	MLinkMetadata[MLinkTypeMStream] = layers.EnumMetadata{DecodeWith: gopacket.DecodeFunc(decodeMStreamLayer), Name: "MStream", LayerType: MStreamLayerType}
+	MLinkMetadata[MLinkTypeMStream] = layers.EnumMetadata{DecodeWith: gopacket.DecodeFunc(mstream.DecodeMStreamLayer), Name: "MStream", LayerType: mstream.MStreamLayerType}
 }
 
 // LayerType returns MLinkMetadata.LayerType
@@ -96,7 +97,7 @@ type MLinkHeader struct {
 	Type MLinkType
 	Sync uint16
 	Seq uint16
-	Len uint16
+	Len uint16 // length of MLink frame including header, payload and CRC in 4-byte words NOT in bytes
 	Src uint16
 	Dst uint16
 }
@@ -121,18 +122,18 @@ func (ml *MLinkLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Seri
 		return err
 	}
 
-	binary.BigEndian.PutUint16(headerBytes[0:2], uint16(ml.Type))
-	binary.BigEndian.PutUint16(headerBytes[2:4], ml.Sync)
-	binary.BigEndian.PutUint16(headerBytes[4:6], ml.Seq)
-	binary.BigEndian.PutUint16(headerBytes[6:8], ml.Len)
-	binary.BigEndian.PutUint16(headerBytes[8:10], ml.Src)
-	binary.BigEndian.PutUint16(headerBytes[10:12], ml.Dst)
+	binary.LittleEndian.PutUint16(headerBytes[0:2], uint16(ml.Type))
+	binary.LittleEndian.PutUint16(headerBytes[2:4], ml.Sync)
+	binary.LittleEndian.PutUint16(headerBytes[4:6], ml.Seq)
+	binary.LittleEndian.PutUint16(headerBytes[6:8], ml.Len)
+	binary.LittleEndian.PutUint16(headerBytes[8:10], ml.Src)
+	binary.LittleEndian.PutUint16(headerBytes[10:12], ml.Dst)
 
 	tailBytes, err := b.AppendBytes(4)
 	if err != nil {
 		return err
 	}
-	binary.BigEndian.PutUint32(tailBytes[0:4], ml.Crc)
+	binary.LittleEndian.PutUint32(tailBytes[0:4], ml.Crc)
 	return nil
 }
 

@@ -19,6 +19,8 @@ import (
 	"github.com/spf13/cobra"
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/discover"
+	"net"
+	"strconv"
 )
 
 const (
@@ -37,10 +39,14 @@ func NewDiscoverCommand() *cobra.Command {
 		Short:         "Start discover server",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if address != "" {
-				discoverConfig.Address = address
+				discoverConfig.Address = net.ParseIP(address)
 			}
 			if port != "" {
-				discoverConfig.Port = port
+				portNum, err := strconv.Atoi(port)
+				if err != nil {
+					return err
+				}
+				discoverConfig.Port = uint16(portNum)
 			}
 			if ifaceName != "" {
 				discoverConfig.Interface = ifaceName

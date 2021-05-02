@@ -18,6 +18,8 @@ import (
 	"github.com/spf13/cobra"
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/mstream"
+	"net"
+	"strconv"
 )
 
 const (
@@ -35,10 +37,14 @@ func NewMStreamCommand() *cobra.Command {
 		Short:         "Start mstream server",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if address != "" {
-				mstreamConfig.Address = address
+				mstreamConfig.Address = net.ParseIP(address)
 			}
 			if port != "" {
-				mstreamConfig.Port = port
+				portNum, err := strconv.Atoi(port)
+				if err != nil {
+					return err
+				}
+				mstreamConfig.Port = uint16(portNum)
 			}
 
 			server, err := mstream.NewServer(mstreamConfig)

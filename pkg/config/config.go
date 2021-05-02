@@ -16,25 +16,26 @@ package config
 
 import (
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"sigs.k8s.io/yaml"
 )
 
 type DiscoverConfig struct {
-	Address string `json:"address,omitempty"`
-	Port string `json:"port,omitempty"`
+	Address net.IP `json:"address,omitempty"`
+	Port uint16 `json:"port,omitempty"`
 	Interface string `json:"interface"`
 }
 
 type MStreamPeer struct {
-	Address string `json:"address,omitempty"`
-	Port string `json:"port,omitempty"`
+	Address net.IP `json:"address,omitempty"`
+	Port uint16 `json:"port,omitempty"`
 }
 
 type MStreamConfig struct {
-	Address string `json:"address,omitempty"`
-	Port string `json:"port,omitempty"`
+	Address net.IP `json:"address,omitempty"`
+	Port uint16 `json:"port,omitempty"`
 	Peers []*MStreamPeer `json:"peers"`
 }
 
@@ -87,16 +88,16 @@ func DefaultConfigPath() string {
 func NewDefaultConfig() *Config {
 	return &Config{
 		DiscoverConfig: &DiscoverConfig{
-			Address: DefaultDiscoverAddress,
+			Address: net.ParseIP(DefaultDiscoverAddress),
 			Port: DefaultDiscoverPort,
 			Interface: DefaultDiscoverInterface,
 		},
 		MStreamConfig: &MStreamConfig{
-			Address: DefaultMStreamAddress,
+			Address: net.ParseIP(DefaultMStreamAddress),
 			Port: DefaultMStreamPort,
 			Peers: []*MStreamPeer{
 				{
-					Address: DefaultMStreamPeerAddress,
+					Address: net.ParseIP(DefaultMStreamPeerAddress),
 					Port: DefaultMStreamPeerPort,
 				},
 			},
