@@ -12,25 +12,28 @@
  limitations under the License.
 */
 
-package mstream
+package srv
 
 import (
-	"fmt"
+	"github.com/google/gopacket"
+	"net"
 )
 
-// ErrMStreamAssemble returned when there is overlapping of fragments or a missing fragment
-type ErrMStreamAssemble struct {
-	What string
+type Captured struct {
+	Data []byte
+	gopacket.CaptureInfo
 }
 
-func (e ErrMStreamAssemble) Error() string {
-	return fmt.Sprintf("Error while assembling MStream frame: %s", e.What)
-}
-
-type ErrMStreamTooManyFragments struct {
-	Number int
-}
-
-func (e ErrMStreamTooManyFragments) Error() string {
-	return fmt.Sprintf("Maximum number of MStream frame fragments is achieved: %d", e.Number)
+// GetAddrPort returns the UDPAddr of the device that sent the packet
+func GetAddrPort(packet gopacket.Packet) (*net.UDPAddr, error) {
+	meta := packet.Metadata()
+	if len(meta.CaptureInfo.AncillaryData) >= 1 {
+		ansilliary := meta.CaptureInfo.AncillaryData[0]
+		udpAddr, ok := ansilliary.(*net.UDPAddr)
+		if !ok {
+			return nil, ErrGetAddr{}
+		}
+		return udpAddr, nil
+	}
+	return nil, ErrGetAddr{}
 }

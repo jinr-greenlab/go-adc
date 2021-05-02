@@ -15,11 +15,14 @@
 package mstream
 
 import (
-	"github.com/spf13/cobra"
-	"jinr.ru/greenlab/go-adc/pkg/config"
-	"jinr.ru/greenlab/go-adc/pkg/mstream"
+	"fmt"
 	"net"
 	"strconv"
+
+	"github.com/spf13/cobra"
+
+	"jinr.ru/greenlab/go-adc/pkg/config"
+	"jinr.ru/greenlab/go-adc/pkg/srv"
 )
 
 const (
@@ -47,7 +50,7 @@ func NewMStreamCommand() *cobra.Command {
 				mstreamConfig.Port = uint16(portNum)
 			}
 
-			server, err := mstream.NewServer(mstreamConfig)
+			server, err := srv.NewMStreamServer(mstreamConfig)
 			if err != nil {
 				return err
 			}
@@ -55,7 +58,7 @@ func NewMStreamCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&address, AddressOptionName, "", "Address to bind. E.g. 192.168.1.2")
-	cmd.Flags().StringVar(&port, PortOptionName, "", "Port number to bind. E.g. 33301")
+	cmd.Flags().StringVar(&port, PortOptionName, "", fmt.Sprintf("Port number to bind. E.g. %d", config.DefaultMStreamPort))
 
 	return cmd
 }

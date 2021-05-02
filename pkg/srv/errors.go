@@ -12,17 +12,15 @@
  limitations under the License.
 */
 
-package discover
+package srv
 
 import (
 	"fmt"
 )
 
-// ErrGetAddr returned when we can not get the address and port of the devices that sent discovery message
-type ErrGetAddr struct {
-	*DeviceDescription
-}
+// ErrGetAddr returned when we can not get the address and port of the devices that sent a packet
+type ErrGetAddr struct {}
 
 func (e ErrGetAddr) Error() string {
-	return fmt.Sprintf("Error while getting device address and port: %s", e.DeviceDescription.SerialNumber)
+	return fmt.Sprintf("Error while getting peer address and port")
 }

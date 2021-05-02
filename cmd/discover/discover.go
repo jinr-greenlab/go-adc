@@ -16,11 +16,13 @@ package discover
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
-	"jinr.ru/greenlab/go-adc/pkg/config"
-	"jinr.ru/greenlab/go-adc/pkg/discover"
 	"net"
 	"strconv"
+
+	"github.com/spf13/cobra"
+
+	"jinr.ru/greenlab/go-adc/pkg/config"
+	"jinr.ru/greenlab/go-adc/pkg/srv"
 )
 
 const (
@@ -51,7 +53,7 @@ func NewDiscoverCommand() *cobra.Command {
 			if ifaceName != "" {
 				discoverConfig.Interface = ifaceName
 			}
-			server, err := discover.NewServer(discoverConfig)
+			server, err := srv.NewDiscoverServer(discoverConfig)
 			if err != nil {
 				return err
 			}
@@ -59,7 +61,7 @@ func NewDiscoverCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&address, AddressOptionName, "", fmt.Sprintf("Address to bind. E.g. %s", config.DefaultDiscoverAddress))
-	cmd.Flags().StringVar(&port, PortOptionName, "", fmt.Sprintf("Port number to bind. E.g. %s", config.DefaultDiscoverPort))
+	cmd.Flags().StringVar(&port, PortOptionName, "", fmt.Sprintf("Port number to bind. E.g. %d", config.DefaultDiscoverPort))
 	cmd.Flags().StringVar(&ifaceName, IfaceNameOptionName, "", "Interface name to listen on. E.g. eth0")
 
 	return cmd

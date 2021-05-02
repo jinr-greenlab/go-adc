@@ -12,7 +12,7 @@
  limitations under the License.
 */
 
-package discover
+package srv
 
 import (
 	"context"
@@ -22,9 +22,9 @@ import (
 	"time"
 
 	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
+	gopacketlayers "github.com/google/gopacket/layers"
 
-	"jinr.ru/greenlab/go-adc/pkg/common"
+	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
@@ -36,15 +36,15 @@ import (
  the IPv4 multicast MAC address of this group is 01-00-5E-00-01-01.`
  */
 
-type Server struct {
+type DiscoverServer struct {
 	context.Context
 	*config.DiscoverConfig
 	*net.Interface
 	*net.UDPAddr
-	chCaptured chan common.Captured
+	chCaptured chan Captured
 }
 
-func NewServer(cfg *config.DiscoverConfig) (*Server, error) {
+func NewDiscoverServer(cfg *config.DiscoverConfig) (*DiscoverServer, error) {
 	log.Debug("Initializing discover server with address: %s port: %d iface: %s",
 		cfg.Address, cfg.Port, cfg.Interface)
 
@@ -57,26 +57,26 @@ func NewServer(cfg *config.DiscoverConfig) (*Server, error) {
 		return nil, err
 	}
 
-	s := &Server{
+	s := &DiscoverServer{
 		Context: context.Background(),
 		DiscoverConfig: cfg,
 		Interface: iface,
 		UDPAddr: uaddr,
-		chCaptured: make(chan common.Captured),
+		chCaptured: make(chan Captured),
 	}
 	return s, nil
 }
 
 // ReadPacketData reads chCaptured channel and returns packet data and metadata.
 // This method is from PacketDataSource interface.
-func (s *Server) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error) {
+func (s *DiscoverServer) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error) {
 	captured := <-s.chCaptured
 	data = captured.Data
 	ci = captured.CaptureInfo
 	return
 }
 
-func (s *Server) Run() error {
+func (s *DiscoverServer) Run() error {
 
 	conn, err := net.ListenMulticastUDP("udp", s.Interface, s.UDPAddr)
 	if err != nil {
@@ -91,18 +91,18 @@ func (s *Server) Run() error {
 	// read packets from the chCaptured channel using the ReadPacketData method and parse them
 	// into DeviceDescription struct
 	go func() {
-		source := gopacket.NewPacketSource(s, layers.LayerTypeLinkLayerDiscovery)
+		source := gopacket.NewPacketSource(s, gopacketlayers.LayerTypeLinkLayerDiscovery)
 		for packet := range source.Packets() {
-			layer := packet.Layer(layers.LayerTypeLinkLayerDiscoveryInfo)
+			layer := packet.Layer(gopacketlayers.LayerTypeLinkLayerDiscoveryInfo)
 			if layer != nil {
-				layer, ok := layer.(*layers.LinkLayerDiscoveryInfo)
+				layer, ok := layer.(*gopacketlayers.LinkLayerDiscoveryInfo)
 				if !ok {
 					log.Error("Error while asserting to LinkLayerDiscoveryInfo")
 					continue
 				}
-				dd := &DeviceDescription{}
-				decodeOrgSpecific(layer.OrgTLVs, dd)
-				peerUDPAddr, handleErr := common.GetAddrPort(packet)
+				dd := &layers.DeviceDescription{}
+				layers.DecodeOrgSpecific(layer.OrgTLVs, dd)
+				peerUDPAddr, handleErr := GetAddrPort(packet)
 				if handleErr != nil {
 					// TODO
 					continue
@@ -130,7 +130,7 @@ func (s *Server) Run() error {
 				AncillaryData: []interface{}{addr},
 			}
 
-			s.chCaptured <- common.Captured{Data: buffer[:length], CaptureInfo: ci}
+			s.chCaptured <- Captured{Data: buffer[:length], CaptureInfo: ci}
 		}
 	}()
 

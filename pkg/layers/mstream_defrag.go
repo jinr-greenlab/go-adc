@@ -12,7 +12,7 @@
  limitations under the License.
 */
 
-package mstream
+package layers
 
 import (
 	"container/list"
@@ -117,9 +117,6 @@ func (fl *fragmentList) assemble(ms *MStreamLayer) (*MStreamLayer, error) {
 			FragmentLength: fl.Highest,
 			FragmentID: ms.FragmentID,
 			FragmentOffset: 0,
-			DeviceSerial: ms.DeviceSerial,
-			UserDefBytes: ms.UserDefBytes,
-			EventNum: ms.EventNum,
 		},
 		BaseLayer: layers.BaseLayer{
 			Payload: result,

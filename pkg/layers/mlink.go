@@ -12,7 +12,7 @@
  limitations under the License.
 */
 
-package mlink
+package layers
 
 import (
 	"encoding/binary"
@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"jinr.ru/greenlab/go-adc/pkg/mstream"
 )
 
 
@@ -75,7 +74,7 @@ func initUnknownMLinkTypes() {
 
 func initActualMLinkTypes() {
 	// TODO init other MLink types once they are implemented
-	MLinkMetadata[MLinkTypeMStream] = layers.EnumMetadata{DecodeWith: gopacket.DecodeFunc(mstream.DecodeMStreamLayer), Name: "MStream", LayerType: mstream.MStreamLayerType}
+	MLinkMetadata[MLinkTypeMStream] = layers.EnumMetadata{DecodeWith: gopacket.DecodeFunc(DecodeMStreamLayer), Name: "MStream", LayerType: MStreamLayerType}
 }
 
 // LayerType returns MLinkMetadata.LayerType

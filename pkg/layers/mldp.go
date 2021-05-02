@@ -12,7 +12,7 @@
  limitations under the License.
 */
 
-package discover
+package layers
 
 import (
 	"encoding/binary"
@@ -151,7 +151,7 @@ func decodeAfi(tlv layers.LLDPOrgSpecificTLV, dd *DeviceDescription) {
 	}
 }
 
-func decodeOrgSpecific(tlvs []layers.LLDPOrgSpecificTLV, dd *DeviceDescription) {
+func DecodeOrgSpecific(tlvs []layers.LLDPOrgSpecificTLV, dd *DeviceDescription) {
 	for _, tlv := range tlvs {
 		switch tlv.OUI {
 		case IEEEOUITIA:

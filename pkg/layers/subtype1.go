@@ -12,13 +12,10 @@
  limitations under the License.
 */
 
-package common
+package layers
 
-import (
-	"github.com/google/gopacket"
-)
-
-type Captured struct {
-	Data []byte
-	gopacket.CaptureInfo
+type Subtype1Header struct {
+	DeviceSerial uint32
+	ChannelNum uint8
+	EventNum uint32
 }
