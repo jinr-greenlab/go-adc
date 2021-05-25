@@ -38,6 +38,12 @@ const (
 	// MLink is the last word of each MLink frame, they call it MLINK_DATA_PADDING_MAGIC or CRC
 	// For ACK frames it is just 0x00000000
 	MLinkCRC = 0x12206249
+	// MLinkMaxFrameSize is the max size of MLink frame including MLink header and CRC
+	MLinkMaxFrameSize = 1400
+	// MLinkMaxPayloadSize is the max size of Mlink frame payload
+	// MLink header 12 bytes
+	// MLink CRC 4 bytes
+	MLinkMaxPayloadSize = MLinkMaxFrameSize - 16
 )
 
 type MLinkType uint16

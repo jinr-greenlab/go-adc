@@ -28,6 +28,10 @@ import (
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
+const (
+	DiscoverPort = 33303
+)
+
 /*
  As defined by the IANA, the leftmost 24 bits of an IPv4 multicast
  MAC address are 0x01005E, the 25th bit is 0, and the rightmost 23
@@ -37,43 +41,34 @@ import (
  */
 
 type DiscoverServer struct {
-	context.Context
-	*config.DiscoverConfig
+	Server
 	*net.Interface
-	*net.UDPAddr
-	chCaptured chan Captured
 }
 
-func NewDiscoverServer(cfg *config.DiscoverConfig) (*DiscoverServer, error) {
+func NewDiscoverServer(cfg *config.Config) (*DiscoverServer, error) {
 	log.Debug("Initializing discover server with address: %s port: %d iface: %s",
-		cfg.Address, cfg.Port, cfg.Interface)
+		cfg.DiscoverIP, DiscoverPort, cfg.DiscoverIface)
 
-	iface, err := net.InterfaceByName(cfg.Interface)
+	iface, err := net.InterfaceByName(cfg.DiscoverIface)
 	if err != nil {
 		return nil, err
 	}
-	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", cfg.Address, cfg.Port))
+
+	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", cfg.DiscoverIP, DiscoverPort))
 	if err != nil {
 		return nil, err
 	}
 
 	s := &DiscoverServer{
-		Context: context.Background(),
-		DiscoverConfig: cfg,
+		Server: Server{
+			Context: context.Background(),
+			UDPAddr: uaddr,
+			chCaptured: make(chan Captured),
+			Config: cfg,
+		},
 		Interface: iface,
-		UDPAddr: uaddr,
-		chCaptured: make(chan Captured),
 	}
 	return s, nil
-}
-
-// ReadPacketData reads chCaptured channel and returns packet data and metadata.
-// This method is from PacketDataSource interface.
-func (s *DiscoverServer) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error) {
-	captured := <-s.chCaptured
-	data = captured.Data
-	ci = captured.CaptureInfo
-	return
 }
 
 func (s *DiscoverServer) Run() error {

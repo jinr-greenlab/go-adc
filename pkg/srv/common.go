@@ -15,8 +15,12 @@
 package srv
 
 import (
-	"github.com/google/gopacket"
+	"context"
 	"net"
+
+	"github.com/google/gopacket"
+
+	"jinr.ru/greenlab/go-adc/pkg/config"
 )
 
 type Captured struct {
@@ -36,4 +40,21 @@ func GetAddrPort(packet gopacket.Packet) (*net.UDPAddr, error) {
 		return udpAddr, nil
 	}
 	return nil, ErrGetAddr{}
+}
+
+type Server struct {
+	context.Context
+	*config.Config
+	*net.UDPAddr
+	chCaptured chan Captured
+	chSend chan Send
+}
+
+// ReadPacketData reads chCaptured channel and returns packet data and metadata.
+// This method is from PacketDataSource interface.
+func (s *Server) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error) {
+	captured := <-s.chCaptured
+	data = captured.Data
+	ci = captured.CaptureInfo
+	return
 }

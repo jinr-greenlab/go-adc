@@ -22,26 +22,16 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-type DiscoverConfig struct {
-	Address net.IP `json:"address,omitempty"`
-	Port uint16 `json:"port,omitempty"`
-	Interface string `json:"interface"`
-}
-
-type MStreamPeer struct {
-	Address net.IP `json:"address,omitempty"`
-	Port uint16 `json:"port,omitempty"`
-}
-
-type MStreamConfig struct {
-	Address net.IP `json:"address,omitempty"`
-	Port uint16 `json:"port,omitempty"`
-	Peers []*MStreamPeer `json:"peers"`
+type Device struct {
+	Name string `json:"name,omitempty"`
+	IP *net.IP `json:"ip,omitempty"`
 }
 
 type Config struct {
-	*DiscoverConfig `json:"discover,omitempty"`
-	*MStreamConfig `json:"mstream,omitempty"`
+	DiscoverIP *net.IP `json:"discoverIP,omitempty"`
+	DiscoverIface string `json:"discoverIface,omitempty"`
+	IP *net.IP `json:"ip,omitempty"`
+	Devices []*Device `json:"devices"`
 	filepath string
 }
 
@@ -86,22 +76,14 @@ func DefaultConfigPath() string {
 }
 
 func NewDefaultConfig() *Config {
+	discoverIP := net.ParseIP(DefaultDiscoverIP)
+	ip := net.ParseIP(DefaultIP)
+
 	return &Config{
-		DiscoverConfig: &DiscoverConfig{
-			Address: net.ParseIP(DefaultDiscoverAddress),
-			Port: DefaultDiscoverPort,
-			Interface: DefaultDiscoverInterface,
-		},
-		MStreamConfig: &MStreamConfig{
-			Address: net.ParseIP(DefaultMStreamAddress),
-			Port: DefaultMStreamPort,
-			Peers: []*MStreamPeer{
-				{
-					Address: net.ParseIP(DefaultMStreamPeerAddress),
-					Port: DefaultMStreamPeerPort,
-				},
-			},
-		},
+		DiscoverIP: &discoverIP,
+		DiscoverIface: DefaultDiscoverIface,
+		IP: &ip,
+		Devices: []*Device{},
 		filepath: DefaultConfigPath(),
 	}
 }

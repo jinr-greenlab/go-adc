@@ -16,53 +16,43 @@ package discover
 
 import (
 	"fmt"
-	"net"
-	"strconv"
-
 	"github.com/spf13/cobra"
+	"net"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/srv"
 )
 
 const (
-	AddressOptionName = "address"
-	PortOptionName = "port"
-	IfaceNameOptionName = "iface-name"
+	IPOptionName = "ip"
+	IfaceOptionName = "iface"
 )
 
-func NewDiscoverCommand() *cobra.Command {
-	var address, port, ifaceName string
+func NewCommand() *cobra.Command {
+	var ip, iface string
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
-	discoverConfig := cfg.DiscoverConfig
 	cmd := &cobra.Command{
 		Use:           "discover",
 		Short:         "Start discover server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if address != "" {
-				discoverConfig.Address = net.ParseIP(address)
+			if ip != "" {
+				parsedIP := net.ParseIP(ip)
+				cfg.DiscoverIP = &parsedIP
 			}
-			if port != "" {
-				portNum, err := strconv.Atoi(port)
-				if err != nil {
-					return err
-				}
-				discoverConfig.Port = uint16(portNum)
+			if iface != "" {
+				cfg.DiscoverIface = iface
 			}
-			if ifaceName != "" {
-				discoverConfig.Interface = ifaceName
-			}
-			server, err := srv.NewDiscoverServer(discoverConfig)
+			server, err := srv.NewDiscoverServer(cfg)
 			if err != nil {
 				return err
 			}
 			return server.Run()
 		},
 	}
-	cmd.Flags().StringVar(&address, AddressOptionName, "", fmt.Sprintf("Address to bind. E.g. %s", config.DefaultDiscoverAddress))
-	cmd.Flags().StringVar(&port, PortOptionName, "", fmt.Sprintf("Port number to bind. E.g. %d", config.DefaultDiscoverPort))
-	cmd.Flags().StringVar(&ifaceName, IfaceNameOptionName, "", "Interface name to listen on. E.g. eth0")
+	cmd.Flags().StringVar(&ip, IPOptionName, "", fmt.Sprintf("IP to bind. E.g. %s", config.DefaultDiscoverIP))
+	cmd.Flags().StringVar(&iface, IfaceOptionName, "",
+		fmt.Sprintf("Interface name to listen on. E.g. %s", config.DefaultDiscoverIface))
 
 	return cmd
 }

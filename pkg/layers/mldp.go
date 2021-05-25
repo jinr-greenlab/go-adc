@@ -60,8 +60,14 @@ func (m *Mac) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf("\"%s\"", m.String())), nil
 }
 
+type DeviceID uint16
+
+func (d *DeviceID) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"0x%x\"", *d)), nil
+}
+
 type DeviceDescription struct {
-	DeviceID uint16 `json:"deviceID,omitempty"`
+	DeviceID DeviceID `json:"deviceID,omitempty"`
 	SerialID uint64 `json:"serialID,omitempty"`
 	ChassisSlot uint16 `json:"chassisSlot,omitempty"`
 	MasterMac Mac `json:"masterMac"`
@@ -130,7 +136,7 @@ func decodeAfi(tlv layers.LLDPOrgSpecificTLV, dd *DeviceDescription) {
 		if len(tlv.Info) < 8 {
 			break
 		}
-		dd.DeviceID = binary.BigEndian.Uint16(tlv.Info[:2])
+		dd.DeviceID = DeviceID(binary.BigEndian.Uint16(tlv.Info[:2]))
 		dd.SerialID = binary.BigEndian.Uint64(streatchByteSlice(tlv.Info[2:8], 8))
 		if len(tlv.Info) >= 10 {
 			dd.ChassisSlot = binary.BigEndian.Uint16(tlv.Info[8:10])

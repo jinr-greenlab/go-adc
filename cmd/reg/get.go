@@ -12,19 +12,15 @@
  limitations under the License.
 */
 
-package config
+package reg
 
-import (
-	"github.com/spf13/cobra"
-)
+import "github.com/spf13/cobra"
 
-func NewCommand() *cobra.Command {
+func NewGetCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "config",
-		Short:         "Config subcommands",
+		Use:           "get",
+		Short:         "get reg value",
 	}
-	cmd.AddCommand(NewInitCommand())
 
 	return cmd
 }
-

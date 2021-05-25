@@ -27,12 +27,12 @@ import (
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
+const (
+	MStreamPort = 33301
+)
+
 type MStreamServer struct {
-	context.Context
-	*config.MStreamConfig
-	*net.UDPAddr
-	chCaptured chan Captured
-	chSend chan Send
+	Server
 }
 
 type Send struct {
@@ -40,30 +40,25 @@ type Send struct {
 	*net.UDPAddr
 }
 
-func NewMStreamServer(cfg *config.MStreamConfig) (*MStreamServer, error) {
-	log.Debug("Initializing mstream server with address: %s port: %d", cfg.Address, cfg.Port)
+func NewMStreamServer(cfg *config.Config) (*MStreamServer, error) {
+	log.Debug("Initializing mstream server with address: %s port: %d", cfg.IP, MStreamPort)
 
-	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", cfg.Address, cfg.Port))
+	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", cfg.IP, MStreamPort))
 	if err != nil {
 		return nil, err
 	}
 
 	s := &MStreamServer{
-		Context: context.Background(),
-		MStreamConfig: cfg,
-		UDPAddr: uaddr,
-		chCaptured: make(chan Captured),
-		chSend: make(chan Send),
+		Server: Server{
+			Context:    context.Background(),
+			Config:     cfg,
+			UDPAddr:    uaddr,
+			chCaptured: make(chan Captured),
+			chSend:     make(chan Send),
+		},
 	}
 
 	return s, nil
-}
-
-func (s *MStreamServer) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error) {
-	captured := <-s.chCaptured
-	data = captured.Data
-	ci = captured.CaptureInfo
-	return
 }
 
 func (s *MStreamServer) Run() error {
@@ -196,14 +191,14 @@ func (s *MStreamServer) SendAck(fragmentID, fragmentOffset uint16, peer *net.UDP
 func (s *MStreamServer) ConnectToPeers() error {
 	// to connect to peer devices it is enough to send them an MStream ack
 	// message with empty payload and with fragmentID = -1 and fragmentOffset = -1
-	for _, peer := range s.MStreamConfig.Peers {
-		peerUDPAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", peer.Address, peer.Port))
+	for _, device := range s.Config.Devices {
+		peerUDPAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", device.IP, MStreamPort))
 		if err != nil {
 			return err
 		}
 		err = s.SendAck(0xffff, 0xffff, peerUDPAddr)
 		if err != nil {
-			log.Error("Error while connecting to MStream peer %s:%s", peer.Address, peer.Port)
+			log.Error("Error while connecting to MStream device %s:%s", device.IP, MStreamPort)
 			return err
 		}
 	}

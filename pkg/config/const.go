@@ -17,11 +17,7 @@ package config
 const (
 	ConfigDir = ".go-adc"
 	ConfigFile = "config"
-	DefaultDiscoverAddress = "239.192.1.1"
-	DefaultDiscoverPort = 33303
-	DefaultDiscoverInterface = "eth0"
-	DefaultMStreamAddress = "192.168.2.100"
-	DefaultMStreamPort = 33301
-	DefaultMStreamPeerAddress = "192.168.2.101"
-	DefaultMStreamPeerPort = 33301
+	DefaultDiscoverIP = "239.192.1.1"
+	DefaultDiscoverIface = "eth0"
+	DefaultIP = "192.168.2.100"
 )

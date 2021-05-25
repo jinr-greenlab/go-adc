@@ -12,41 +12,20 @@
  limitations under the License.
 */
 
-package mstream
+package reg
 
 import (
-	"fmt"
 	"github.com/spf13/cobra"
-	"net"
-
-	"jinr.ru/greenlab/go-adc/pkg/config"
-	"jinr.ru/greenlab/go-adc/pkg/srv"
-)
-
-const (
-	IPOptionName = "ip"
 )
 
 func NewCommand() *cobra.Command {
-	var ip string
-	cfg := config.NewDefaultConfig()
-	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "mstream",
-		Short:         "Start mstream server",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if ip != "" {
-				parsedIP := net.ParseIP(ip)
-				cfg.IP = &parsedIP
-			}
-			server, err := srv.NewMStreamServer(cfg)
-			if err != nil {
-				return err
-			}
-			return server.Run()
-		},
+		Use:           "reg",
+		Short:         "get/set device reg values",
 	}
-	cmd.Flags().StringVar(&ip, IPOptionName, "", fmt.Sprintf("IP to bind. E.g. %s", config.DefaultIP))
+
+	cmd.AddCommand(NewGetCommand())
+	cmd.AddCommand(NewSetCommand())
 
 	return cmd
 }
