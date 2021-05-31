@@ -97,12 +97,12 @@ func (s *DiscoverServer) Run() error {
 				}
 				dd := &layers.DeviceDescription{}
 				layers.DecodeOrgSpecific(layer.OrgTLVs, dd)
-				peerUDPAddr, handleErr := GetAddrPort(packet)
+				udpAddr, handleErr := GetAddrPort(packet)
 				if handleErr != nil {
 					// TODO
 					continue
 				}
-				dd.SetPeer(peerUDPAddr)
+				dd.SetSource(udpAddr)
 				fmt.Print(dd.String())
 			}
 		}
@@ -117,12 +117,18 @@ func (s *DiscoverServer) Run() error {
 				return
 			}
 
+			udpAddr, readErr := net.ResolveUDPAddr("udp", addr.String())
+			if readErr != nil {
+				errChan <- readErr
+				return
+			}
+
 			ci := gopacket.CaptureInfo{
 				Length: length,
 				CaptureLength: length,
 				InterfaceIndex: s.Interface.Index,
 				Timestamp: time.Now(),
-				AncillaryData: []interface{}{addr},
+				AncillaryData: []interface{}{udpAddr},
 			}
 
 			s.chCaptured <- Captured{Data: buffer[:length], CaptureInfo: ci}

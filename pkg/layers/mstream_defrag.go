@@ -127,7 +127,6 @@ func (fl *fragmentList) assemble(ms *MStreamLayer) (*MStreamLayer, error) {
 	return out, nil
 }
 
-
 // fragmentListKey is used as a map key. It fully identifies the fragmented
 // MStream frame since it contains two MLink endpoints (see gopacket.Flow and gopacket.Endpoint)
 // plus FragmentID which is the same for all fragments within a MStream frame

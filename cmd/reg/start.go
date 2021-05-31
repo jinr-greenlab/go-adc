@@ -15,38 +15,39 @@
 package reg
 
 import (
+	"fmt"
+	"net"
+
 	"github.com/spf13/cobra"
-	adccmd "jinr.ru/greenlab/go-adc/pkg/cmd"
+
 	"jinr.ru/greenlab/go-adc/pkg/config"
-	"strconv"
+	"jinr.ru/greenlab/go-adc/pkg/srv"
 )
 
 const (
-	RegNumOptionName = "regnum"
+	IPOptionName = "ip"
 )
 
-func NewGetCommand() *cobra.Command {
-	var deviceIP, regNum string
+func NewStartCommand() *cobra.Command {
+	var ip string
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "get",
-		Short:         "Get reg value",
+		Use:           "start",
+		Short:         "Start reg server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			regrw, err := adccmd.NewRegRW(cfg)
+			if ip != "" {
+				parsedIP := net.ParseIP(ip)
+				cfg.IP = &parsedIP
+			}
+			server, err := srv.NewRegServer(cfg)
 			if err != nil {
 				return err
 			}
-			regNumInt, err := strconv.ParseInt(regNum, 0, 16)
-			if err != nil {
-				return err
-			}
-			regrw.RegRead(uint16(regNumInt), deviceIP)
-			return nil
+			return server.Run()
 		},
 	}
-	cmd.Flags().StringVar(&deviceIP, DeviceIPOptionName, "", "Device IP")
-	cmd.Flags().StringVar(&regNum, RegNumOptionName, "", "Register address")
+	cmd.Flags().StringVar(&ip, IPOptionName, "", fmt.Sprintf("IP to bind. E.g. %s", config.DefaultIP))
 
 	return cmd
 }

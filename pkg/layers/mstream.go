@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	// MStreamLayerNum identifies the layer number
+	// MStreamLayerNum identifies the layer
 	MStreamLayerNum = 1998
 )
 
@@ -56,7 +56,6 @@ func (ms *MStreamLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Se
 		return err
 	}
 
-	//binary.BigEndian.PutUint16(headerBytes[0:2], ms.FragmentLength)
 	binary.LittleEndian.PutUint16(headerBytes[0:2], ms.FragmentLength)
 
 	headerBytes[2] = (ms.Flags << 2) | ms.Subtype
@@ -78,7 +77,7 @@ func (ms *MStreamLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback)
 		Payload: data[16:], // data without MStream header
 	}
 
-	ms.FragmentLength = binary.BigEndian.Uint16(data[0:2])
+	ms.FragmentLength = binary.LittleEndian.Uint16(data[0:2])
 	if ms.FragmentLength == 0 {
 		return errors.New("Invalid MStream header: FragmentLength = 0")
 	}
@@ -86,8 +85,8 @@ func (ms *MStreamLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback)
 	ms.Subtype = data[2] & 0b00000011 // Subtype is two least significant bits
 	ms.Flags = (data[2] >> 2) & 0b00111111 // Flags is six high bits
 	ms.DeviceID = data[3]
-	ms.FragmentID = binary.BigEndian.Uint16(data[4:6]) // FragmentID takes 2 bytes for MStream 2.x
-	ms.FragmentOffset = binary.BigEndian.Uint16(data[6:8]) // FragmentOffset takes 2 bytes for MStream 2.x
+	ms.FragmentID = binary.LittleEndian.Uint16(data[4:6]) // FragmentID takes 2 bytes for MStream 2.x
+	ms.FragmentOffset = binary.LittleEndian.Uint16(data[6:8]) // FragmentOffset takes 2 bytes for MStream 2.x
 
 	return nil
 }

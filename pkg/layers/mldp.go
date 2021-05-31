@@ -87,7 +87,7 @@ type DeviceDescription struct {
 	Port uint16 `json:"port"`
 }
 
-func (dd *DeviceDescription) SetPeer(udpAddr *net.UDPAddr) error {
+func (dd *DeviceDescription) SetSource(udpAddr *net.UDPAddr) error {
 	splitted := strings.Split(udpAddr.String(), ":")
 	dd.Address = net.ParseIP(splitted[0])
 	convertedPort, err := strconv.Atoi(splitted[1])

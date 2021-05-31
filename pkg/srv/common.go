@@ -28,6 +28,11 @@ type Captured struct {
 	gopacket.CaptureInfo
 }
 
+type Send struct {
+	Data []byte
+	*net.UDPAddr
+}
+
 // GetAddrPort returns the UDPAddr of the device that sent the packet
 func GetAddrPort(packet gopacket.Packet) (*net.UDPAddr, error) {
 	meta := packet.Metadata()

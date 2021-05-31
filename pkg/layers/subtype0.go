@@ -20,6 +20,6 @@ type Subtype0Header struct {
 	EventNum uint32
 }
 
-//ms.DeviceSerial = binary.BigEndian.Uint32(data[8:12])
+//ms.DeviceSerial = binary.LittleEndian.Uint32(data[8:12])
 //ms.UserDefBytes = data[12]
-//ms.EventNum = binary.BigEndian.Uint32(data[13:16])
+//ms.EventNum = binary.LittleEndian.Uint32(data[13:16])

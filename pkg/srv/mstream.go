@@ -35,11 +35,6 @@ type MStreamServer struct {
 	Server
 }
 
-type Send struct {
-	Data []byte
-	*net.UDPAddr
-}
-
 func NewMStreamServer(cfg *config.Config) (*MStreamServer, error) {
 	log.Debug("Initializing mstream server with address: %s port: %d", cfg.IP, MStreamPort)
 
@@ -83,6 +78,8 @@ func (s *MStreamServer) Run() error {
 			if ms != nil {
 				log.Debug("MStream frame successfully parsed")
 				ms := ms.(*layers.MStreamLayer)
+				// empty flow is ok until we work with the only device
+				// once we have many devices we have to use non empty flow
 				flow := &gopacket.Flow{}
 				out, handleErr := defragmenter.Defrag(ms, flow)
 				if handleErr != nil {
@@ -93,11 +90,11 @@ func (s *MStreamServer) Run() error {
 					continue
 				}
 				log.Debug("Successfully decoded and defragmented MStream frame")
-				peerUDPAddr, handleErr := GetAddrPort(packet)
+				udpaddr, handleErr := GetAddrPort(packet)
 				if handleErr != nil {
 					continue
 				}
-				s.SendAck(ms.FragmentID, ms.FragmentOffset, peerUDPAddr)
+				s.SendAck(ms.FragmentID, ms.FragmentOffset, udpaddr)
 			}
 		}
 	}()
@@ -111,7 +108,7 @@ func (s *MStreamServer) Run() error {
 				errChan <- readErr
 				return
 			}
-			peerUDPAddr, readErr := net.ResolveUDPAddr("udp", addr.String())
+			udpAddr, readErr := net.ResolveUDPAddr("udp", addr.String())
 			if readErr != nil {
 				errChan <- readErr
 				return
@@ -120,7 +117,7 @@ func (s *MStreamServer) Run() error {
 				Length: length,
 				CaptureLength: length,
 				Timestamp: time.Now(),
-				AncillaryData: []interface{}{peerUDPAddr},
+				AncillaryData: []interface{}{udpAddr},
 			}
 
 			s.chCaptured <- Captured{Data: buffer[:length], CaptureInfo: ci}
@@ -140,7 +137,7 @@ func (s *MStreamServer) Run() error {
 		}
 	}()
 
-	err = s.ConnectToPeers()
+	err = s.ConnectToDevices()
 	if err != nil {
 		return err
 	}
@@ -154,15 +151,16 @@ func (s *MStreamServer) Run() error {
 	}
 }
 
-func (s *MStreamServer) SendAck(fragmentID, fragmentOffset uint16, peer *net.UDPAddr) error {
+func (s *MStreamServer) SendAck(fragmentID, fragmentOffset uint16, udpAddr *net.UDPAddr) error {
 	ml := &layers.MLinkLayer{}
 	ml.Type = layers.MLinkTypeMStream
 	ml.Sync = layers.MLinkSync
 	// 3 words for MLink header + 1 word CRC + 2 words for MStream header
 	ml.Len = 6
 	ml.Seq = 0
-	ml.Src = 0xfefe
-	ml.Dst = 1
+	// Since this is ACK message SRC and DST are reversed.
+	ml.Src = layers.MLinkDeviceAddr
+	ml.Dst = layers.MLinkHostAddr
 	ml.Crc = 0
 
 	ms := &layers.MStreamLayer{}
@@ -177,18 +175,18 @@ func (s *MStreamServer) SendAck(fragmentID, fragmentOffset uint16, peer *net.UDP
 	opts := gopacket.SerializeOptions{}
 	err := gopacket.SerializeLayers(buf, opts, ml, ms)
 	if err != nil {
-		log.Error("Error while serializing layers when sending MStream ack message to peer %s", peer)
+		log.Error("Error while serializing layers when sending MStream ack message to device %s", udpAddr)
 		return err
 	}
 
 	s.chSend <- Send{
 		Data: buf.Bytes(),
-		UDPAddr: peer,
+		UDPAddr: udpAddr,
 	}
 	return nil
 }
 
-func (s *MStreamServer) ConnectToPeers() error {
+func (s *MStreamServer) ConnectToDevices() error {
 	// to connect to peer devices it is enough to send them an MStream ack
 	// message with empty payload and with fragmentID = -1 and fragmentOffset = -1
 	for _, device := range s.Config.Devices {

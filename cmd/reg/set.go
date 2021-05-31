@@ -14,13 +14,17 @@
 
 package reg
 
-import "github.com/spf13/cobra"
+import (
+	"github.com/spf13/cobra"
+)
 
 func NewSetCommand() *cobra.Command {
+	var deviceIP string
 	cmd := &cobra.Command{
 		Use:           "set",
-		Short:         "set reg value",
+		Short:         "Set reg value",
 	}
+	cmd.Flags().StringVar(&deviceIP, DeviceIPOptionName, "", "Device IP")
 
 	return cmd
 }

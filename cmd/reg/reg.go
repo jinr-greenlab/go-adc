@@ -18,14 +18,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	DeviceIPOptionName = "device-ip"
+)
+
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "reg",
-		Short:         "get/set device reg values",
+		Short:         "Interact with devices using reg interface",
 	}
 
 	cmd.AddCommand(NewGetCommand())
 	cmd.AddCommand(NewSetCommand())
+	cmd.AddCommand(NewStartCommand())
 
 	return cmd
 }

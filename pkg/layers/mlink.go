@@ -20,8 +20,14 @@ import (
 	"fmt"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+
+	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
+const (
+	MLinkHostAddr = 1
+	MLinkDeviceAddr = 0xfefe
+)
 
 func init() {
 	initUnknownMLinkTypes()
@@ -29,15 +35,18 @@ func init() {
 }
 
 const (
-	// MLinkLayerNum identifies the layer number
+	// MLinkLayerNum identifies the layer
 	MLinkLayerNum = 1999
 	// MLinkEndPointNum
 	MLinkEndpointNum = 1000
 	// MLinkSync is a magic number that appears in the beginning of each MLink frame
 	MLinkSync = 0x2A50
 	// MLink is the last word of each MLink frame, they call it MLINK_DATA_PADDING_MAGIC or CRC
-	// For ACK frames it is just 0x00000000
-	MLinkCRC = 0x12206249
+	// For MStream ACK frames it is 0x00000000
+	// For MStream frames sent from a device to host it is 0x12206249
+	// For register r/w request it is crc32 sum
+	// For register r/w response it is 0x00000000
+	MLinkMStreamCRC = 0x12206249
 	// MLinkMaxFrameSize is the max size of MLink frame including MLink header and CRC
 	MLinkMaxFrameSize = 1400
 	// MLinkMaxPayloadSize is the max size of Mlink frame payload
@@ -51,8 +60,8 @@ type MLinkType uint16
 const (
 	// TODO add other MLink types once they are implemented
 	MLinkTypeMStream MLinkType = 0x5354
-	MLinkTypeRegisterRWRequest MLinkType = 0x0101
-	MLinkTypeRegisterRWResponse MLinkType = 0x0102
+	MLinkTypeRegRequest MLinkType = 0x0101
+	MLinkTypeRegResponse MLinkType = 0x0102
 )
 
 type errorDecoderForMLinkType int
@@ -79,8 +88,8 @@ func initUnknownMLinkTypes() {
 }
 
 func initActualMLinkTypes() {
-	// TODO init other MLink types once they are implemented
 	MLinkMetadata[MLinkTypeMStream] = layers.EnumMetadata{DecodeWith: gopacket.DecodeFunc(DecodeMStreamLayer), Name: "MStream", LayerType: MStreamLayerType}
+	MLinkMetadata[MLinkTypeRegResponse] = layers.EnumMetadata{DecodeWith: gopacket.DecodeFunc(DecodeRegLayer), Name: "Reg", LayerType: RegLayerType}
 }
 
 // LayerType returns MLinkMetadata.LayerType
@@ -120,19 +129,26 @@ func (ml *MLinkLayer) LayerType() gopacket.LayerType {
 	return MLinkLayerType
 }
 
+// SerializeHeader serializes only MLink header (not tail) to a buffer
+// This is necessary because CRC field depends on the contents of the MLink frame
+// and we calculate it in upper layers manually using serialized MLink header.
+// Otherwise CRC calculates could encapsulated into SerializeTo method.
+func (ml *MLinkLayer) SerializeHeader(buf []byte) {
+	binary.LittleEndian.PutUint16(buf[0:2], uint16(ml.Type))
+	binary.LittleEndian.PutUint16(buf[2:4], ml.Sync)
+	binary.LittleEndian.PutUint16(buf[4:6], ml.Seq)
+	binary.LittleEndian.PutUint16(buf[6:8], ml.Len)
+	binary.LittleEndian.PutUint16(buf[8:10], ml.Src)
+	binary.LittleEndian.PutUint16(buf[10:12], ml.Dst)
+}
+
 // SerializeTo serializes the layer into bytes and writes the bytes to the SerializeBuffer
 func (ml *MLinkLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) error {
 	headerBytes, err := b.PrependBytes(12)
 	if err != nil {
 		return err
 	}
-
-	binary.LittleEndian.PutUint16(headerBytes[0:2], uint16(ml.Type))
-	binary.LittleEndian.PutUint16(headerBytes[2:4], ml.Sync)
-	binary.LittleEndian.PutUint16(headerBytes[4:6], ml.Seq)
-	binary.LittleEndian.PutUint16(headerBytes[6:8], ml.Len)
-	binary.LittleEndian.PutUint16(headerBytes[8:10], ml.Src)
-	binary.LittleEndian.PutUint16(headerBytes[10:12], ml.Dst)
+	ml.SerializeHeader(headerBytes)
 
 	tailBytes, err := b.AppendBytes(4)
 	if err != nil {
@@ -149,25 +165,29 @@ func (ml *MLinkLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) e
 		return errors.New("MLink packet too short")
 	}
 
-	if binary.BigEndian.Uint16(data[2:4]) != MLinkSync {
+	if binary.LittleEndian.Uint16(data[2:4]) != MLinkSync {
+		log.Debug("Mlink sync is invalid")
 		return errors.New(fmt.Sprintf("Wrong MLink sync. Must be %d", MLinkSync))
 	}
 
-	if binary.BigEndian.Uint32(data[len(data)-4:]) != MLinkCRC {
-		return errors.New(fmt.Sprintf("Wrong MLink tail. Must be %d", MLinkCRC))
-	}
+	// TODO Discuss with AFI and unificate CRC to be crc32 sum
+	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	// This check is only valid for MStream
+	//if binary.LittleEndian.Uint32(data[len(data)-4:]) != MLinkMStreamCRC {
+	//	return errors.New(fmt.Sprintf("Wrong MLink tail for MStream frame. Must be %d", MLinkMStreamCRC))
+	//}
 
 	ml.BaseLayer = layers.BaseLayer{
 		Contents: data[0:12], // MLink header 12 bytes
 		Payload: data[12:len(data)-4], // data without MLink header and without CRC in the end of each MLink frame
 	}
 
-	ml.Type = MLinkType(binary.BigEndian.Uint16(data[0:2]))
-	ml.Sync = binary.BigEndian.Uint16(data[2:4])
-	ml.Seq = binary.BigEndian.Uint16(data[4:6])
-	ml.Len = binary.BigEndian.Uint16(data[6:8])
-	ml.Src = binary.BigEndian.Uint16(data[8:10])
-	ml.Dst = binary.BigEndian.Uint16(data[10:12])
+	ml.Type = MLinkType(binary.LittleEndian.Uint16(data[0:2]))
+	ml.Sync = binary.LittleEndian.Uint16(data[2:4])
+	ml.Seq = binary.LittleEndian.Uint16(data[4:6])
+	ml.Len = binary.LittleEndian.Uint16(data[6:8])
+	ml.Src = binary.LittleEndian.Uint16(data[8:10])
+	ml.Dst = binary.LittleEndian.Uint16(data[10:12])
 
 	return nil
 }
@@ -180,6 +200,7 @@ func decodeMLinkLayer(data []byte, p gopacket.PacketBuilder) error {
 	ml := &MLinkLayer{}
 	err := ml.DecodeFromBytes(data, p)
 	if err != nil {
+		log.Error("Error while decoding mlink layer: %s", err)
 		return err
 	}
 	p.AddLayer(ml)
