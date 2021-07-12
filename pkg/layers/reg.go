@@ -18,6 +18,7 @@ import (
 	"encoding/binary"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
 const (
@@ -25,11 +26,15 @@ const (
 	RegLayerNum = 1997
 )
 
-type RegLayer struct {
-	layers.BaseLayer
+type RegOp struct {
 	Read bool
 	RegNum uint16
 	RegValue uint16 // if Read is true, RegValue is ignored
+}
+
+type RegLayer struct {
+	layers.BaseLayer
+	RegOps []*RegOp
 }
 
 var RegLayerType = gopacket.RegisterLayerType(RegLayerNum,
@@ -45,16 +50,20 @@ func (reg *RegLayer) LayerType() gopacket.LayerType {
 // and sometimes we have to calculate it manually in upper layers instead of encapsulating
 // it to MLinkLayer.SerializeTo method.
 func (reg *RegLayer) Serialize(buf []byte) {
-	if reg.Read {
-		binary.LittleEndian.PutUint32(buf[0:4], 0x80000000 | ((uint32(reg.RegNum) & 0x7fff) << 16))
-	} else {
-		binary.LittleEndian.PutUint32(buf[0:4], 0x00000000 | ((uint32(reg.RegNum) & 0x7fff) << 16) | uint32(reg.RegValue))
+	for i, op := range reg.RegOps {
+		offset := i * 4
+		if op.Read {
+			binary.LittleEndian.PutUint32(buf[offset:offset+4], 0x80000000|((uint32(op.RegNum)&0x7fff)<<16))
+		} else {
+			binary.LittleEndian.PutUint32(buf[offset:offset+4], 0x00000000|((uint32(op.RegNum)&0x7fff)<<16)|uint32(op.RegValue))
+		}
+		log.Debug("RegLayer word: %x", buf[offset:offset+4])
 	}
 }
 
 // SerializeTo serializes the register read/write request layer into bytes and writes the bytes to the SerializeBuffer
 func (reg *RegLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) error {
-	bytes, err := b.AppendBytes(4)
+	bytes, err := b.AppendBytes(len(reg.RegOps) * 4)
 	if err != nil {
 		return err
 	}
@@ -67,14 +76,19 @@ func (reg *RegLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) er
 		Contents: data[:],
 		Payload: []byte{},
 	}
-	word := binary.LittleEndian.Uint32(data[0:4])
-	if int8((word & 0x80000000) >> 31) == 1 {
-		reg.Read = true
-	} else {
-		reg.Read = false
+	for i := 0; i < len(data) / 4; i++ {
+		offset := i * 4
+		word := binary.LittleEndian.Uint32(data[offset+0:offset+4])
+		regOp := &RegOp{}
+		if int8((word&0x80000000)>>31) == 1 {
+			regOp.Read = true
+		} else {
+			regOp.Read = false
+		}
+		regOp.RegNum = uint16((word & 0x7fff0000) >> 16)
+		regOp.RegValue = uint16(word & 0x0000ffff)
+		reg.RegOps = append(reg.RegOps, regOp)
 	}
-	reg.RegNum = uint16((word & 0x7fff0000) >> 16)
-	reg.RegValue = uint16(word & 0x0000ffff)
 
 	return nil
 }

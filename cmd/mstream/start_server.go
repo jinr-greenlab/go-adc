@@ -27,12 +27,12 @@ const (
 	IPOptionName = "ip"
 )
 
-func NewCommand() *cobra.Command {
+func NewStartServerCommand() *cobra.Command {
 	var ip string
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "mstream",
+		Use:           "start-server",
 		Short:         "Start mstream server",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if ip != "" {
