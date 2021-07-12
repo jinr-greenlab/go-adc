@@ -62,6 +62,8 @@ const (
 	MLinkTypeMStream MLinkType = 0x5354
 	MLinkTypeRegRequest MLinkType = 0x0101
 	MLinkTypeRegResponse MLinkType = 0x0102
+	MLinkTypeMemRequest MLinkType = 0x0105
+	MLinkTypeMemResponse MLinkType = 0x0106
 )
 
 type errorDecoderForMLinkType int
