@@ -16,15 +16,38 @@ package reg
 
 import (
 	"github.com/spf13/cobra"
+	adccmd "jinr.ru/greenlab/go-adc/pkg/cmd"
+	"jinr.ru/greenlab/go-adc/pkg/config"
+	"strconv"
 )
 
 func NewSetCommand() *cobra.Command {
-	var deviceIP string
+	var deviceIP, regNum, regValue string
+	cfg := config.NewDefaultConfig()
+	cfg.Load()
 	cmd := &cobra.Command{
 		Use:           "set",
 		Short:         "Set reg value",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			regrw, err := adccmd.NewRegRW(cfg)
+			if err != nil {
+				return err
+			}
+			regNumInt, err := strconv.ParseUint(regNum, 0, 16)
+			if err != nil {
+				return err
+			}
+			regValueInt, err := strconv.ParseUint(regValue, 0, 16)
+			if err != nil {
+				return err
+			}
+			regrw.RegWrite(uint16(regNumInt), uint16(regValueInt), deviceIP)
+			return nil
+		},
 	}
 	cmd.Flags().StringVar(&deviceIP, DeviceIPOptionName, "", "Device IP")
+	cmd.Flags().StringVar(&regNum, RegNumOptionName, "", "Register address")
+	cmd.Flags().StringVar(&regValue, RegValueOptionName, "", "Register value")
 
 	return cmd
 }

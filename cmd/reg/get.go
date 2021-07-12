@@ -21,10 +21,6 @@ import (
 	"strconv"
 )
 
-const (
-	RegNumOptionName = "regnum"
-)
-
 func NewGetCommand() *cobra.Command {
 	var deviceIP, regNum string
 	cfg := config.NewDefaultConfig()
@@ -37,7 +33,7 @@ func NewGetCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			regNumInt, err := strconv.ParseInt(regNum, 0, 16)
+			regNumInt, err := strconv.ParseUint(regNum, 0, 16)
 			if err != nil {
 				return err
 			}

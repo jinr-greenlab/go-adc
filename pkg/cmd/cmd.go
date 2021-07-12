@@ -17,6 +17,7 @@ package cmd
 import (
 	"fmt"
 	"jinr.ru/greenlab/go-adc/pkg/config"
+	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/srv"
 	"net"
 	"time"
@@ -48,7 +49,34 @@ func (regrw *RegRW) RegRead(regNum uint16, deviceIP string) error {
 	}
 	go regrw.RegServer.Run()
 	time.Sleep(1000 * time.Millisecond)
-	regrw.RegServer.SendRequest(true, regNum, 0, deviceUdpAddr)
+	regOps := []*layers.RegOp{
+		{
+			Read: true,
+			RegNum: regNum,
+		},
+	}
+	regrw.RegServer.RegRequest(regOps, deviceUdpAddr)
+	time.Sleep(1000 * time.Millisecond)
+	regrw.RegServer.GetRegState(regNum)
+	time.Sleep(1000 * time.Millisecond)
+	return nil
+}
+
+func (regrw *RegRW) RegWrite(regNum, regValue uint16, deviceIP string) error {
+	deviceUdpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", deviceIP, srv.RegPort))
+	if err != nil {
+		return err
+	}
+	go regrw.RegServer.Run()
+	time.Sleep(1000 * time.Millisecond)
+	regOps := []*layers.RegOp{
+		{
+			Read: false,
+			RegNum: regNum,
+			RegValue: regValue,
+		},
+	}
+	regrw.RegServer.RegRequest(regOps, deviceUdpAddr)
 	time.Sleep(1000 * time.Millisecond)
 	regrw.RegServer.GetRegState(regNum)
 	time.Sleep(1000 * time.Millisecond)
@@ -56,5 +84,23 @@ func (regrw *RegRW) RegRead(regNum uint16, deviceIP string) error {
 }
 
 
+func (regrw *RegRW) StartMStream() error {
+	go regrw.RegServer.Run()
+	time.Sleep(1000 * time.Millisecond)
+	regrw.RegServer.StartMStream()
+	time.Sleep(1000 * time.Millisecond)
+	regrw.RegServer.GetRegState(srv.CtrlReg)
+	time.Sleep(1000 * time.Millisecond)
+	return nil
+}
 
+func (regrw *RegRW) StopMStream() error {
+	go regrw.RegServer.Run()
+	time.Sleep(1000 * time.Millisecond)
+	regrw.RegServer.StopMStream()
+	time.Sleep(1000 * time.Millisecond)
+	regrw.RegServer.GetRegState(srv.CtrlReg)
+	time.Sleep(1000 * time.Millisecond)
+	return nil
+}
 

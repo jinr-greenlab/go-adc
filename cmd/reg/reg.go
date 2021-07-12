@@ -20,6 +20,8 @@ import (
 
 const (
 	DeviceIPOptionName = "device-ip"
+	RegNumOptionName = "regnum"
+	RegValueOptionName = "regval"
 )
 
 func NewCommand() *cobra.Command {
