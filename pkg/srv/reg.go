@@ -32,6 +32,15 @@ const (
 	RegPort = 33300
 )
 
+//const (
+//	BOARD_REG_COUNT
+//	MEM_BIT_SELECT_CTRL
+//	MEM_CH_CTRL
+//	MEM_CH_BLC_THR_HI
+//	MEM_CH_BLC_THR_LO
+//)
+
+
 const (
 	CtrlReg = 0x40
 	CtrlDefault = 0x0000
@@ -62,14 +71,9 @@ const (
 type RegServer struct {
 	Server
 	Seq uint16
+	// this is temporary solution, register state must be placed into a database
 	RegState map[uint16]uint16
-	chRegStateOp chan RegStateOp
-}
-
-type RegStateOp struct {
-	Read bool
-	RegNum uint16
-	RegValue uint16
+	chRegOp chan *layers.RegOp
 }
 
 func NewRegServer(cfg *config.Config) (*RegServer, error) {
@@ -90,7 +94,7 @@ func NewRegServer(cfg *config.Config) (*RegServer, error) {
 		},
 		Seq: 0,
 		RegState: make(map[uint16]uint16),
-		chRegStateOp: make(chan RegStateOp),
+		chRegOp: make(chan *layers.RegOp),
 	}
 	return s, nil
 }
@@ -115,7 +119,9 @@ func (s *RegServer) Run() error {
 			if reg != nil {
 				log.Debug("Reg response successfully parsed")
 				reg := reg.(*layers.RegLayer)
-				s.SetRegState(reg.RegNum, reg.RegValue)
+				for _, op := range reg.RegOps {
+					s.SetRegState(op.RegNum, op.RegValue)
+				}
 			}
 		}
 	}()
@@ -159,8 +165,8 @@ func (s *RegServer) Run() error {
 
 	go func() {
 		for {
-			regStateOp := <-s.chRegStateOp
-			log.Debug("Register operation: read: %t regnum: %x regvalue: %x",
+			regStateOp := <-s.chRegOp
+			log.Debug("Register database operation: read: %t regnum: %x regvalue: %x",
 				regStateOp.Read, regStateOp.RegNum, regStateOp.RegValue)
 			if regStateOp.Read {
 				regValue, ok := s.RegState[regStateOp.RegNum]
@@ -187,30 +193,29 @@ func (s *RegServer) NextSeq() uint16 {
 }
 
 func (s *RegServer) SetRegState(regNum, regValue uint16) {
-	log.Debug("SetRegState: %x %x", regNum, regValue)
-	regStateOp := RegStateOp{
+	log.Debug("Update register database: %x %x", regNum, regValue)
+	s.chRegOp <- &layers.RegOp{
 		Read: false,
 		RegNum: regNum,
 		RegValue: regValue,
 	}
-	s.chRegStateOp <- regStateOp
 }
 
 func (s *RegServer) GetRegState(regNum uint16) {
-	log.Debug("GetRegState: %x", regNum)
-	regStateOp := RegStateOp{
+	log.Debug("Read register database: %x", regNum)
+	regOp := &layers.RegOp{
 		Read: true,
 		RegNum: regNum,
 	}
-	s.chRegStateOp <- regStateOp
+	s.chRegOp <- regOp
 }
 
-func (s *RegServer) SendRequest(read bool, regNum, regValue uint16, udpAddr *net.UDPAddr) error {
+func (s *RegServer) RegRequest(ops []*layers.RegOp, udpAddr *net.UDPAddr) error {
 	ml := &layers.MLinkLayer{}
 	ml.Type = layers.MLinkTypeRegRequest
 	ml.Sync = layers.MLinkSync
-	// 3 words for MLink header + 1 word CRC + 1 word for request
-	ml.Len = uint16(5)
+	// 3 words for MLink header + 1 word CRC + N words for request
+	ml.Len = uint16(4 + len(ops))
 	ml.Seq = s.NextSeq()
 	ml.Src = layers.MLinkHostAddr
 	ml.Dst = layers.MLinkDeviceAddr
@@ -219,18 +224,16 @@ func (s *RegServer) SendRequest(read bool, regNum, regValue uint16, udpAddr *net
 	mlHeaderBytes := make([]byte, 12)
 	ml.SerializeHeader(mlHeaderBytes)
 
-	req := &layers.RegLayer{}
-	req.Read = read
-	req.RegNum = regNum
-	req.RegValue = regValue
-	reqBytes := make([]byte, 4)
-	req.Serialize(reqBytes)
+	reg := &layers.RegLayer{}
+	reg.RegOps = ops
+	regBytes := make([]byte, len(ops) * 4)
+	reg.Serialize(regBytes)
 
-	ml.Crc = crc32.ChecksumIEEE(append(mlHeaderBytes, reqBytes...))
+	ml.Crc = crc32.ChecksumIEEE(append(mlHeaderBytes, regBytes...))
 
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{}
-	err := gopacket.SerializeLayers(buf, opts, ml, req)
+	err := gopacket.SerializeLayers(buf, opts, ml, reg)
 	if err != nil {
 		log.Error("Error while serializing layers when sending register r/w request to %s", udpAddr)
 		return err
@@ -243,3 +246,100 @@ func (s *RegServer) SendRequest(read bool, regNum, regValue uint16, udpAddr *net
 	return nil
 }
 
+func (s *RegServer) MemRequest(op *layers.MemOp, udpAddr *net.UDPAddr) error {
+	ml := &layers.MLinkLayer{}
+	ml.Type = layers.MLinkTypeMemRequest
+	ml.Sync = layers.MLinkSync
+	// 3 words for MLink header + 1 word CRC + 1 word MemOp header + N words MemOp data
+	ml.Len = uint16(4 + op.Size + 1)
+	ml.Seq = s.NextSeq()
+	ml.Src = layers.MLinkHostAddr
+	ml.Dst = layers.MLinkDeviceAddr
+
+	// Calculate crc32 checksum
+	mlHeaderBytes := make([]byte, 12)
+	ml.SerializeHeader(mlHeaderBytes)
+
+	mem := &layers.MemLayer{}
+	mem.MemOp = op
+	memBytes := make([]byte, (1 + op.Size) * 4)
+	mem.Serialize(memBytes)
+
+	ml.Crc = crc32.ChecksumIEEE(append(mlHeaderBytes, memBytes...))
+
+	buf := gopacket.NewSerializeBuffer()
+	opts := gopacket.SerializeOptions{}
+	err := gopacket.SerializeLayers(buf, opts, ml, mem)
+	if err != nil {
+		log.Error("Error while serializing layers when sending memory r/w request to %s", udpAddr)
+		return err
+	}
+
+	s.chSend <- Send{
+		Data: buf.Bytes(),
+		UDPAddr: udpAddr,
+	}
+	return nil
+}
+
+
+
+func (s *RegServer) RegRequestToAllDevices(ops []*layers.RegOp) error {
+	for _, device := range s.Config.Devices {
+		udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", device.IP, RegPort))
+		if err != nil {
+			return err
+		}
+		err = s.RegRequest(ops, udpAddr)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// see DominoDevice::writeSettings()
+
+func (s *RegServer) StopMStream() error {
+	ops := []*layers.RegOp{
+		{
+			RegNum: CtrlReg,
+			RegValue: 1,
+		},
+		{
+			RegNum: CtrlReg,
+			RegValue: 0,
+		},
+	}
+	return s.RegRequestToAllDevices(ops)
+}
+
+func (s *RegServer) StartMStream() error {
+	ops := []*layers.RegOp{
+		{
+			RegNum: CtrlReg,
+			RegValue: 0,
+		},
+		{
+			RegNum: CtrlReg,
+			RegValue: 0x8000,
+		},
+	}
+	return s.RegRequestToAllDevices(ops)
+}
+
+
+//func chBaseMemAddr(ch uint32) uint32 {
+//	return ch << 14;
+//}
+//
+//func (s *RegServer) MemWrite(offset uint32, data []uint32) {
+//}
+//
+//
+//func (s *RegServer) WriteChReg(ch uint32, addr uint16, data uint32) {
+//	writeAddr := MEM_BIT_SELECT_CTRL
+//	writeAddr |= addr
+//	writeAddr |= chBaseMemAddr(ch)
+//	s.MemWrite(writeAddr, data)
+//}
