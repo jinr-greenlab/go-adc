@@ -74,6 +74,7 @@ func (s *MStreamServer) Run() error {
 		source := gopacket.NewPacketSource(s, layers.MLinkLayerType)
 		defragmenter := layers.NewMStreamDefragmenter()
 		for packet := range source.Packets() {
+			log.Debug("MStream frame received")
 			ms := packet.Layer(layers.MStreamLayerType)
 			if ms != nil {
 				log.Debug("MStream frame successfully parsed")
@@ -190,11 +191,11 @@ func (s *MStreamServer) ConnectToDevices() error {
 	// to connect to peer devices it is enough to send them an MStream ack
 	// message with empty payload and with fragmentID = -1 and fragmentOffset = -1
 	for _, device := range s.Config.Devices {
-		peerUDPAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", device.IP, MStreamPort))
+		udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", device.IP, MStreamPort))
 		if err != nil {
 			return err
 		}
-		err = s.SendAck(0xffff, 0xffff, peerUDPAddr)
+		err = s.SendAck(0xffff, 0xffff, udpAddr)
 		if err != nil {
 			log.Error("Error while connecting to MStream device %s:%s", device.IP, MStreamPort)
 			return err
