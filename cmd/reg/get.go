@@ -16,7 +16,7 @@ package reg
 
 import (
 	"github.com/spf13/cobra"
-	adccmd "jinr.ru/greenlab/go-adc/pkg/cmd"
+	"jinr.ru/greenlab/go-adc/pkg/command"
 	"jinr.ru/greenlab/go-adc/pkg/config"
 )
 
@@ -28,13 +28,13 @@ func NewGetCommand() *cobra.Command {
 		Use:           "get",
 		Short:         "Get reg value",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			client := adccmd.NewClient(cfg)
-			client.RegGet(device, regNum)
+			apiClient := command.NewApiClient(cfg)
+			apiClient.RegGet(device, regNum)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&device, DeviceOptionName, "", "Device name")
-	cmd.Flags().StringVar(&regNum, RegNumOptionName, "", "Register address")
+	cmd.Flags().StringVar(&regNum, RegNumOptionName, "", "Register address (hexadecimal)")
 
 	return cmd
 }
