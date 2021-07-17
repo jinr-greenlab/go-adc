@@ -35,6 +35,7 @@ type Config struct {
 	filepath string
 }
 
+// Persist serialized the config and saves it to the config file
 func (c *Config) Persist(overwrite bool) error {
 	if _, err := os.Stat(c.filepath); err == nil && !overwrite {
 		return ErrConfigFileExists{Path: c.filepath}
@@ -59,12 +60,23 @@ func (c *Config) Persist(overwrite bool) error {
 	return nil
 }
 
+// Load reads config file and returns the unmarshalled config structure
 func (c *Config) Load() error {
 	data, err := ioutil.ReadFile(c.filepath)
 	if err != nil {
 		return err
 	}
 	return yaml.Unmarshal(data, c)
+}
+
+// GetDeviceByName ...
+func (c *Config) GetDeviceByName(name string) *Device {
+	for i, device := range c.Devices {
+		if device.Name == name {
+			return c.Devices[i]
+		}
+	}
+	return nil
 }
 
 func DefaultConfigPath() string {
