@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	DeviceIPOptionName = "device-ip"
+	DeviceOptionName = "device"
 	RegNumOptionName = "regnum"
 	RegValueOptionName = "regval"
 )

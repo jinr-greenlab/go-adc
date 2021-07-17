@@ -16,7 +16,6 @@ package mstream
 
 import (
 	"github.com/spf13/cobra"
-	adccmd "jinr.ru/greenlab/go-adc/pkg/cmd"
 	"jinr.ru/greenlab/go-adc/pkg/config"
 )
 
@@ -27,11 +26,11 @@ func NewStopDevicesCommand() *cobra.Command {
 		Use:           "stop-devices",
 		Short:         "Stop MStream on all devices",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			regrw, err := adccmd.NewRegRW(cfg)
-			if err != nil {
-				return err
-			}
-			regrw.StopMStream()
+			//regrw, err := adccmd.NewRegRW(cfg)
+			//if err != nil {
+			//	return err
+			//}
+			//regrw.StopMStream()
 			return nil
 		},
 	}

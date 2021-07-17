@@ -18,30 +18,22 @@ import (
 	"github.com/spf13/cobra"
 	adccmd "jinr.ru/greenlab/go-adc/pkg/cmd"
 	"jinr.ru/greenlab/go-adc/pkg/config"
-	"strconv"
 )
 
 func NewGetCommand() *cobra.Command {
-	var deviceIP, regNum string
+	var device, regNum string
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
 		Use:           "get",
 		Short:         "Get reg value",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			regrw, err := adccmd.NewRegRW(cfg)
-			if err != nil {
-				return err
-			}
-			regNumInt, err := strconv.ParseUint(regNum, 0, 16)
-			if err != nil {
-				return err
-			}
-			regrw.RegRead(uint16(regNumInt), deviceIP)
+			client := adccmd.NewClient(cfg)
+			client.RegGet(device, regNum)
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&deviceIP, DeviceIPOptionName, "", "Device IP")
+	cmd.Flags().StringVar(&device, DeviceOptionName, "", "Device name")
 	cmd.Flags().StringVar(&regNum, RegNumOptionName, "", "Register address")
 
 	return cmd
