@@ -16,91 +16,22 @@ package cmd
 
 import (
 	"fmt"
-	"jinr.ru/greenlab/go-adc/pkg/config"
-	"jinr.ru/greenlab/go-adc/pkg/layers"
+	"github.com/imroc/req"
 	"jinr.ru/greenlab/go-adc/pkg/srv"
-	"net"
-	"time"
+
+	"jinr.ru/greenlab/go-adc/pkg/config"
 )
 
-// This package is temporary. It is needed only during development for some intermedite testing.
-
-type RegRW struct {
-	*srv.RegServer
+type Client struct {
 	*config.Config
 }
 
-func NewRegRW(cfg *config.Config) (*RegRW, error) {
-	regServer, err := srv.NewRegServer(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return &RegRW{
-		RegServer: regServer,
+func NewClient(cfg *config.Config) *Client {
+	return &Client{
 		Config: cfg,
-	}, nil
-}
-
-
-func (regrw *RegRW) RegRead(regNum uint16, deviceIP string) error {
-	deviceUdpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", deviceIP, srv.RegPort))
-	if err != nil {
-		return err
 	}
-	go regrw.RegServer.Run()
-	time.Sleep(1000 * time.Millisecond)
-	regOps := []*layers.RegOp{
-		{
-			Read: true,
-			RegNum: regNum,
-		},
-	}
-	regrw.RegServer.RegRequest(regOps, deviceUdpAddr)
-	time.Sleep(1000 * time.Millisecond)
-	regrw.RegServer.GetRegState(regNum)
-	time.Sleep(1000 * time.Millisecond)
-	return nil
 }
 
-func (regrw *RegRW) RegWrite(regNum, regValue uint16, deviceIP string) error {
-	deviceUdpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", deviceIP, srv.RegPort))
-	if err != nil {
-		return err
-	}
-	go regrw.RegServer.Run()
-	time.Sleep(1000 * time.Millisecond)
-	regOps := []*layers.RegOp{
-		{
-			Read: false,
-			RegNum: regNum,
-			RegValue: regValue,
-		},
-	}
-	regrw.RegServer.RegRequest(regOps, deviceUdpAddr)
-	time.Sleep(1000 * time.Millisecond)
-	regrw.RegServer.GetRegState(regNum)
-	time.Sleep(1000 * time.Millisecond)
-	return nil
+func (c *Client) RegGet(device, regnum string) {
+	req.Get(fmt.Sprintf("http://%s:%s/api/regget/%s/%s", c.Config.IP, srv.ApiPort, device, regnum))
 }
-
-
-func (regrw *RegRW) StartMStream() error {
-	go regrw.RegServer.Run()
-	time.Sleep(1000 * time.Millisecond)
-	regrw.RegServer.StartMStream()
-	time.Sleep(1000 * time.Millisecond)
-	regrw.RegServer.GetRegState(srv.CtrlReg)
-	time.Sleep(1000 * time.Millisecond)
-	return nil
-}
-
-func (regrw *RegRW) StopMStream() error {
-	go regrw.RegServer.Run()
-	time.Sleep(1000 * time.Millisecond)
-	regrw.RegServer.StopMStream()
-	time.Sleep(1000 * time.Millisecond)
-	regrw.RegServer.GetRegState(srv.CtrlReg)
-	time.Sleep(1000 * time.Millisecond)
-	return nil
-}
-

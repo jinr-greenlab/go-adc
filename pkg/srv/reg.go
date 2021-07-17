@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/google/gopacket"
+	"github.com/gorilla/mux"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
@@ -30,6 +31,7 @@ import (
 
 const (
 	RegPort = 33300
+	ApiPort = 8000
 )
 
 //const (
@@ -70,6 +72,7 @@ const (
 
 type RegServer struct {
 	Server
+	*mux.Router
 	Seq uint16
 	// this is temporary solution, register state must be placed into a database
 	RegState map[uint16]uint16
@@ -79,6 +82,8 @@ type RegServer struct {
 func NewRegServer(cfg *config.Config) (*RegServer, error) {
 	log.Debug("Initializing reg server with address: %s port: %d", cfg.IP, RegPort)
 
+	ctx := context.Background()
+
 	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", cfg.IP, RegPort))
 	if err != nil {
 		return nil, err
@@ -86,7 +91,7 @@ func NewRegServer(cfg *config.Config) (*RegServer, error) {
 
 	s := &RegServer{
 		Server: Server{
-			Context:      context.Background(),
+			Context: ctx,
 			Config: cfg,
 			UDPAddr:      uaddr,
 			chCaptured:   make(chan Captured),
@@ -177,6 +182,10 @@ func (s *RegServer) Run() error {
 				s.RegState[regStateOp.RegNum] = regStateOp.RegValue
 			}
 		}
+	}()
+
+	go func() {
+		s.StartApiServer()
 	}()
 
 	// read packets for the packets channel and send them
