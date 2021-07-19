@@ -24,6 +24,7 @@ import (
 	"go.etcd.io/bbolt"
 	"hash/crc32"
 	"net"
+	"strings"
 	"time"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
@@ -34,7 +35,9 @@ import (
 const (
 	RegPort = 33300
 	ApiPort = 8000
-	BucketName = "reg"
+	BucketNamePrefix = "reg_"
+	MStreamActionStart = "start"
+	MStreamActionStop = "stop"
 )
 
 //const (
@@ -78,13 +81,6 @@ const (
 	TsReadReg64 = 0x5C
 )
 
-type RegDBOp struct {
-	ChResponse chan Reg
-	ChError chan error
-	Update bool
-	Reg
-}
-
 type RegServer struct {
 	Server
 	*mux.Router
@@ -107,11 +103,13 @@ func NewRegServer(cfg *config.Config) (*RegServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	// create bucket in the register database
+	// create buckets in the register database for all devices
 	if err := db.Update(func(tx *bbolt.Tx) error {
-		_, err := tx.CreateBucket([]byte(BucketName))
-		if err != nil {
-			return err
+		for _, device := range cfg.Devices {
+			_, err = tx.CreateBucketIfNotExists([]byte(bucketName(device.Name)))
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	}); err != nil {
@@ -151,12 +149,17 @@ func (s *RegServer) Run() error {
 		source := gopacket.NewPacketSource(s, layers.MLinkLayerType)
 		for packet := range source.Packets() {
 			log.Debug("Reg packet received")
+			deviceName, packetErr := GetDeviceName(packet)
+			if packetErr != nil {
+				log.Error(packetErr.Error())
+				continue
+			}
 			reg := packet.Layer(layers.RegLayerType)
 			if reg != nil {
-				log.Debug("Reg response successfully parsed")
+				log.Debug("Reg packet successfully parsed")
 				reg := reg.(*layers.RegLayer)
 				for _, op := range reg.RegOps {
-					s.SetRegState(op.RegNum, op.RegValue)
+					s.SetRegState(op.RegNum, op.RegValue, deviceName)
 				}
 			}
 		}
@@ -170,16 +173,23 @@ func (s *RegServer) Run() error {
 				errChan <- readErr
 				return
 			}
-			peerUDPAddr, readErr := net.ResolveUDPAddr("udp", addr.String())
+			udpAddr, readErr := net.ResolveUDPAddr("udp", addr.String())
 			if readErr != nil {
 				errChan <- readErr
 				return
 			}
+			ipAddr := net.ParseIP(strings.Split(addr.String(), ":")[0])
+			device, err := s.GetDeviceByIP(&ipAddr)
+			if err != nil {
+				log.Debug("Device not found: %s", ipAddr.String())
+				continue
+			}
+
 			ci := gopacket.CaptureInfo{
 				Length: length,
 				CaptureLength: length,
 				Timestamp: time.Now(),
-				AncillaryData: []interface{}{peerUDPAddr},
+				AncillaryData: []interface{}{udpAddr, device.Name},
 			}
 
 			s.chCaptured <- Captured{Data: buffer[:length], CaptureInfo: ci}
@@ -216,12 +226,13 @@ func (s *RegServer) NextSeq() uint16 {
 	seq := s.Seq; s.Seq++; return seq
 }
 
-func (s *RegServer) SetRegState(regNum, regValue uint16) error {
+// SetRegState
+func (s *RegServer) SetRegState(regNum, regValue uint16, deviceName string) error {
 	log.Debug("SetRegState: RegNum: %x RegValue: %x", regNum, regValue)
 	if err := s.DB.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(BucketName))
+		b := tx.Bucket([]byte(bucketName(deviceName)))
 		if b == nil {
-			return errors.New(fmt.Sprintf("Bucket not found: %s", BucketName))
+			return errors.New(fmt.Sprintf("Bucket not found: %s", bucketName(deviceName)))
 		}
 		if err := b.Put(uint16ToByte(regNum), uint16ToByte(regValue)); err != nil {
 			return err
@@ -233,13 +244,14 @@ func (s *RegServer) SetRegState(regNum, regValue uint16) error {
 	return nil
 }
 
-func (s *RegServer) GetRegState(regNum uint16) (uint16, error) {
+// GetRegState
+func (s *RegServer) GetRegState(regNum uint16, deviceName string) (uint16, error) {
 	log.Debug("GetRegState: RegNum: %x", regNum)
 	var regValue uint16
 	if err := s.DB.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(BucketName))
+		b := tx.Bucket([]byte(bucketName(deviceName)))
 		if b == nil {
-			return errors.New(fmt.Sprintf("Bucket not found: %s", BucketName))
+			return errors.New(fmt.Sprintf("Bucket not found: %s", bucketName(deviceName)))
 		}
 		value := b.Get(uint16ToByte(regNum))
 		if value == nil {
@@ -253,7 +265,17 @@ func (s *RegServer) GetRegState(regNum uint16) (uint16, error) {
 	return regValue, nil
 }
 
-func (s *RegServer) RegRequest(ops []*layers.RegOp, udpAddr *net.UDPAddr) error {
+func (s *RegServer) RegRequest(ops []*layers.RegOp, deviceName string) error {
+	device, err := s.Config.GetDeviceByName(deviceName)
+	if err != nil {
+		return err
+	}
+
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", device.IP, RegPort))
+	if err != nil {
+		return err
+	}
+
 	ml := &layers.MLinkLayer{}
 	ml.Type = layers.MLinkTypeRegRequest
 	ml.Sync = layers.MLinkSync
@@ -276,7 +298,7 @@ func (s *RegServer) RegRequest(ops []*layers.RegOp, udpAddr *net.UDPAddr) error 
 
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{}
-	err := gopacket.SerializeLayers(buf, opts, ml, reg)
+	err = gopacket.SerializeLayers(buf, opts, ml, reg)
 	if err != nil {
 		log.Error("Error while serializing layers when sending register r/w request to %s", udpAddr)
 		return err
@@ -289,7 +311,17 @@ func (s *RegServer) RegRequest(ops []*layers.RegOp, udpAddr *net.UDPAddr) error 
 	return nil
 }
 
-func (s *RegServer) MemRequest(op *layers.MemOp, udpAddr *net.UDPAddr) error {
+func (s *RegServer) MemRequest(op *layers.MemOp, deviceName string) error {
+	device, err := s.Config.GetDeviceByName(deviceName)
+	if err != nil {
+		return err
+	}
+
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", device.IP, RegPort))
+	if err != nil {
+		return err
+	}
+
 	ml := &layers.MLinkLayer{}
 	ml.Type = layers.MLinkTypeMemRequest
 	ml.Sync = layers.MLinkSync
@@ -312,7 +344,7 @@ func (s *RegServer) MemRequest(op *layers.MemOp, udpAddr *net.UDPAddr) error {
 
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{}
-	err := gopacket.SerializeLayers(buf, opts, ml, mem)
+	err = gopacket.SerializeLayers(buf, opts, ml, mem)
 	if err != nil {
 		log.Error("Error while serializing layers when sending memory r/w request to %s", udpAddr)
 		return err
@@ -326,63 +358,46 @@ func (s *RegServer) MemRequest(op *layers.MemOp, udpAddr *net.UDPAddr) error {
 }
 
 
+// see DominoDevice::writeSettings()
 
-func (s *RegServer) RegRequestToAllDevices(ops []*layers.RegOp) error {
-	for _, device := range s.Config.Devices {
-		udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", device.IP, RegPort))
-		if err != nil {
-			return err
+
+func (s *RegServer) MStreamAction(action, deviceName string) error {
+	var ops []*layers.RegOp
+	switch action {
+	case MStreamActionStart:
+		ops = []*layers.RegOp{
+			{
+				RegNum:   CtrlReg,
+				RegValue: 0,
+			},
+			{
+				RegNum:   CtrlReg,
+				RegValue: 0x8000,
+			},
 		}
-		err = s.RegRequest(ops, udpAddr)
-		if err != nil {
-			return err
+	case MStreamActionStop:
+		ops = []*layers.RegOp{
+			{
+				RegNum: CtrlReg,
+				RegValue: 1,
+			},
+			{
+				RegNum: CtrlReg,
+				RegValue: 0,
+			},
 		}
+	default:
+		return errors.New(fmt.Sprintf("Unknown MStream action: %s", action))
 	}
+
+	err := s.RegRequest(ops, deviceName)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
-// see DominoDevice::writeSettings()
-
-func (s *RegServer) StopMStream() error {
-	ops := []*layers.RegOp{
-		{
-			RegNum: CtrlReg,
-			RegValue: 1,
-		},
-		{
-			RegNum: CtrlReg,
-			RegValue: 0,
-		},
-	}
-	return s.RegRequestToAllDevices(ops)
+func bucketName(deviceName string) string {
+	return fmt.Sprintf("%s%s", BucketNamePrefix, deviceName)
 }
-
-func (s *RegServer) StartMStream() error {
-	ops := []*layers.RegOp{
-		{
-			RegNum: CtrlReg,
-			RegValue: 0,
-		},
-		{
-			RegNum: CtrlReg,
-			RegValue: 0x8000,
-		},
-	}
-	return s.RegRequestToAllDevices(ops)
-}
-
-
-//func chBaseMemAddr(ch uint32) uint32 {
-//	return ch << 14;
-//}
-//
-//func (s *RegServer) MemWrite(offset uint32, data []uint32) {
-//}
-//
-//
-//func (s *RegServer) WriteChReg(ch uint32, addr uint16, data uint32) {
-//	writeAddr := MEM_BIT_SELECT_CTRL
-//	writeAddr |= addr
-//	writeAddr |= chBaseMemAddr(ch)
-//	s.MemWrite(writeAddr, data)
-//}

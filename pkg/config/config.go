@@ -15,6 +15,8 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
@@ -71,13 +73,23 @@ func (c *Config) Load() error {
 }
 
 // GetDeviceByName ...
-func (c *Config) GetDeviceByName(name string) *Device {
+func (c *Config) GetDeviceByName(name string) (*Device, error) {
 	for i, device := range c.Devices {
 		if device.Name == name {
-			return c.Devices[i]
+			return c.Devices[i], nil
 		}
 	}
-	return nil
+	return nil, errors.New(fmt.Sprintf("Device not found: %s", name))
+}
+
+// GetDeviceByIP ...
+func (c *Config) GetDeviceByIP(ip *net.IP) (*Device, error) {
+	for i, device := range c.Devices {
+		if device.IP.String() == ip.String() {
+			return c.Devices[i], nil
+		}
+	}
+	return nil, errors.New(fmt.Sprintf("Device not found: %s", ip.String()))
 }
 
 func DefaultConfigPath() string {

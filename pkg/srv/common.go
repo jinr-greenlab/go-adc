@@ -16,6 +16,7 @@ package srv
 
 import (
 	"context"
+	"errors"
 	"net"
 
 	"github.com/google/gopacket"
@@ -37,14 +38,28 @@ type Send struct {
 func GetAddrPort(packet gopacket.Packet) (*net.UDPAddr, error) {
 	meta := packet.Metadata()
 	if len(meta.CaptureInfo.AncillaryData) >= 1 {
-		ansilliary := meta.CaptureInfo.AncillaryData[0]
-		udpAddr, ok := ansilliary.(*net.UDPAddr)
+		ancillary := meta.CaptureInfo.AncillaryData[0]
+		udpAddr, ok := ancillary.(*net.UDPAddr)
 		if !ok {
 			return nil, ErrGetAddr{}
 		}
 		return udpAddr, nil
 	}
 	return nil, ErrGetAddr{}
+}
+
+// GetDeviceName returns the UDPAddr of the device that sent the packet
+func GetDeviceName(packet gopacket.Packet) (string, error) {
+	meta := packet.Metadata()
+	if len(meta.CaptureInfo.AncillaryData) >= 2 {
+		ancillary := meta.CaptureInfo.AncillaryData[1]
+		deviceName, ok := ancillary.(string)
+		if !ok {
+			return "", errors.New("Error while getting device name: can not cast to string")
+		}
+		return deviceName, nil
+	}
+	return "", errors.New("Error while getting device name: not enough ancillary data")
 }
 
 type Server struct {

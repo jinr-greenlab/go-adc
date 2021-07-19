@@ -6,7 +6,6 @@ import (
 	"github.com/gorilla/mux"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
-	"net"
 	"net/http"
 	"strconv"
 )
@@ -38,6 +37,7 @@ func (s *RegServer) configureRouter() {
 	// regnum and regval must be hexadecimal integers
 	subRouter.HandleFunc("/reg/get/{device}/{regnum:0x[0-9abcdef]{4}}", s.handleRegGet()).Methods("GET")
 	subRouter.HandleFunc("/reg/set/{device}", s.handleRegSet()).Methods("POST")
+	subRouter.HandleFunc("/mstream/{device}/{action}", s.handleMStreamAction()).Methods("GET")
 }
 
 func (s *RegServer) handleRegGet() http.HandlerFunc {
@@ -46,19 +46,13 @@ func (s *RegServer) handleRegGet() http.HandlerFunc {
 
 		log.Debug("Handling RegGet request: device: %s, regNum: %s", vars["device"], vars["regnum"])
 
-		dev := s.Config.GetDeviceByName(vars["device"])
-		if dev == nil {
-			http.Error(w, fmt.Sprintf("Device %s not found", vars["device"]), http.StatusNotFound)
-			return
-		}
-
 		parsedRegNum, err := strconv.ParseUint(vars["regnum"], 0, 16)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		regValue, err := s.GetRegState(uint16(parsedRegNum))
+		regValue, err := s.GetRegState(uint16(parsedRegNum), vars["device"])
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
@@ -74,26 +68,15 @@ func (s *RegServer) handleRegSet() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 
-		log.Debug("Handling RegSet request: device: %s", vars["device"])
-
-		dev := s.Config.GetDeviceByName(vars["device"])
-		if dev == nil {
-			http.Error(w, fmt.Sprintf("Device %s not found", vars["device"]), http.StatusNotFound)
-			return
-		}
-
-		deviceUdpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", dev.IP, RegPort))
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Can not resolve device address: %s", vars["device"]), http.StatusBadRequest)
-			return
-		}
-
 		regHex := &RegHex{}
-		err = json.NewDecoder(r.Body).Decode(regHex)
+		err := json.NewDecoder(r.Body).Decode(regHex)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
+
+		log.Debug("Handling RegSet request: device: %s regNum: %s regValue: %s",
+			vars["device"], regHex.RegNum, regHex.RegValue)
 
 		parsedRegNum, err := strconv.ParseUint(regHex.RegNum, 0, 16)
 		if err != nil {
@@ -115,7 +98,21 @@ func (s *RegServer) handleRegSet() http.HandlerFunc {
 			},
 		}
 
-		err = s.RegRequest(regOps, deviceUdpAddr)
+		err = s.RegRequest(regOps, vars["device"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
+}
+
+func (s *RegServer) handleMStreamAction() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+
+		log.Debug("Handling MStream action request: device: %s action: %s", vars["device"], vars["action"])
+
+		err := s.MStreamAction(vars["action"], vars["device"])
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return

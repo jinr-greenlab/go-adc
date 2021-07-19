@@ -22,5 +22,5 @@ import (
 type ErrGetAddr struct {}
 
 func (e ErrGetAddr) Error() string {
-	return fmt.Sprintf("Error while getting peer address and port")
+	return fmt.Sprintf("Error while getting device address and port")
 }
