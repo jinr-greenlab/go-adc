@@ -46,7 +46,7 @@ type Logger struct {
 
 var	logger = &Logger{
 	level:  DefaultLogLevel,
-	Logger: log.New(os.Stderr, LogPrefix, log.LstdFlags|log.Llongfile),
+	Logger: log.New(os.Stderr, LogPrefix, log.LstdFlags),
 }
 
 func Init(out io.Writer) {

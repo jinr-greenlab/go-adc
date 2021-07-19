@@ -17,6 +17,7 @@ package config
 const (
 	ConfigDir = ".go-adc"
 	ConfigFile = "config"
+	DBFile = "db.bolt"
 	DefaultDiscoverIP = "239.192.1.1"
 	DefaultDiscoverIface = "eth0"
 	DefaultIP = "192.168.2.100"

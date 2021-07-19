@@ -16,13 +16,15 @@ package srv
 
 import (
 	"context"
+	"encoding/binary"
+	"errors"
 	"fmt"
+	"github.com/google/gopacket"
+	"github.com/gorilla/mux"
+	"go.etcd.io/bbolt"
 	"hash/crc32"
 	"net"
 	"time"
-
-	"github.com/google/gopacket"
-	"github.com/gorilla/mux"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
@@ -32,6 +34,7 @@ import (
 const (
 	RegPort = 33300
 	ApiPort = 8000
+	BucketName = "reg"
 )
 
 //const (
@@ -42,6 +45,11 @@ const (
 //	MEM_CH_BLC_THR_LO
 //)
 
+func uint16ToByte(v uint16) []byte {
+    b := make([]byte, 2)
+    binary.BigEndian.PutUint16(b, v)
+    return b
+}
 
 const (
 	CtrlReg = 0x40
@@ -70,13 +78,18 @@ const (
 	TsReadReg64 = 0x5C
 )
 
+type RegDBOp struct {
+	ChResponse chan Reg
+	ChError chan error
+	Update bool
+	Reg
+}
+
 type RegServer struct {
 	Server
 	*mux.Router
 	Seq uint16
-	// this is temporary solution, register state must be placed into a database
-	RegState map[uint16]uint16
-	chRegOp chan *layers.RegOp
+	DB *bbolt.DB
 }
 
 func NewRegServer(cfg *config.Config) (*RegServer, error) {
@@ -89,6 +102,22 @@ func NewRegServer(cfg *config.Config) (*RegServer, error) {
 		return nil, err
 	}
 
+	// open register database
+	db, err := bbolt.Open(cfg.DBPath, 0600, nil)
+	if err != nil {
+		return nil, err
+	}
+	// create bucket in the register database
+	if err := db.Update(func(tx *bbolt.Tx) error {
+		_, err := tx.CreateBucket([]byte(BucketName))
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
 	s := &RegServer{
 		Server: Server{
 			Context: ctx,
@@ -98,8 +127,8 @@ func NewRegServer(cfg *config.Config) (*RegServer, error) {
 			chSend:       make(chan Send),
 		},
 		Seq: 0,
-		RegState: make(map[uint16]uint16),
-		chRegOp: make(chan *layers.RegOp),
+		DB: db,
+
 	}
 	return s, nil
 }
@@ -112,10 +141,12 @@ func (s *RegServer) Run() error {
 	}
 
 	defer conn.Close()
+	defer s.DB.Close()
 
 	errChan := make(chan error, 1)
 	buffer := make([]byte, 65536)
 
+	// Read messages from network and update register database
 	go func() {
 		source := gopacket.NewPacketSource(s, layers.MLinkLayerType)
 		for packet := range source.Packets() {
@@ -169,22 +200,6 @@ func (s *RegServer) Run() error {
 	}()
 
 	go func() {
-		for {
-			regStateOp := <-s.chRegOp
-			log.Debug("Register database operation: read: %t regnum: %x regvalue: %x",
-				regStateOp.Read, regStateOp.RegNum, regStateOp.RegValue)
-			if regStateOp.Read {
-				regValue, ok := s.RegState[regStateOp.RegNum]
-				if ok {
-					log.Debug("Register: %x = %x\n", regStateOp.RegNum, regValue)
-				}
-			} else {
-				s.RegState[regStateOp.RegNum] = regStateOp.RegValue
-			}
-		}
-	}()
-
-	go func() {
 		s.StartApiServer()
 	}()
 
@@ -201,22 +216,41 @@ func (s *RegServer) NextSeq() uint16 {
 	seq := s.Seq; s.Seq++; return seq
 }
 
-func (s *RegServer) SetRegState(regNum, regValue uint16) {
-	log.Debug("Update register database: %x %x", regNum, regValue)
-	s.chRegOp <- &layers.RegOp{
-		Read: false,
-		RegNum: regNum,
-		RegValue: regValue,
+func (s *RegServer) SetRegState(regNum, regValue uint16) error {
+	log.Debug("SetRegState: RegNum: %x RegValue: %x", regNum, regValue)
+	if err := s.DB.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(BucketName))
+		if b == nil {
+			return errors.New(fmt.Sprintf("Bucket not found: %s", BucketName))
+		}
+		if err := b.Put(uint16ToByte(regNum), uint16ToByte(regValue)); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
+	return nil
 }
 
-func (s *RegServer) GetRegState(regNum uint16) {
-	log.Debug("Read register database: %x", regNum)
-	regOp := &layers.RegOp{
-		Read: true,
-		RegNum: regNum,
+func (s *RegServer) GetRegState(regNum uint16) (uint16, error) {
+	log.Debug("GetRegState: RegNum: %x", regNum)
+	var regValue uint16
+	if err := s.DB.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(BucketName))
+		if b == nil {
+			return errors.New(fmt.Sprintf("Bucket not found: %s", BucketName))
+		}
+		value := b.Get(uint16ToByte(regNum))
+		if value == nil {
+			return errors.New(fmt.Sprintf("Key not found: %d", regNum))
+		}
+		regValue = binary.BigEndian.Uint16(value)
+		return nil
+	}); err != nil {
+		return 0, err
 	}
-	s.chRegOp <- regOp
+	return regValue, nil
 }
 
 func (s *RegServer) RegRequest(ops []*layers.RegOp, udpAddr *net.UDPAddr) error {

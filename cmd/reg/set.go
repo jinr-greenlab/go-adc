@@ -15,6 +15,8 @@
 package reg
 
 import (
+	"fmt"
+	"os"
 	"github.com/spf13/cobra"
 	"jinr.ru/greenlab/go-adc/pkg/command"
 	"jinr.ru/greenlab/go-adc/pkg/config"
@@ -29,7 +31,10 @@ func NewSetCommand() *cobra.Command {
 		Short:         "Set reg value",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			apiClient := command.NewApiClient(cfg)
-			apiClient.RegSet(device, regNum, regValue)
+			err := apiClient.RegSet(device, regNum, regValue)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err.Error())
+			}
 			return nil
 		},
 	}

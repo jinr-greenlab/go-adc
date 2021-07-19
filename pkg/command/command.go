@@ -30,7 +30,7 @@ type ApiClient struct {
 func NewApiClient(cfg *config.Config) *ApiClient {
 	return &ApiClient{
 		Config: cfg,
-		ApiPrefix: fmt.Sprintf("http://%s:%s/api", cfg.IP, srv.ApiPort),
+		ApiPrefix: fmt.Sprintf("http://%s:%d/api", cfg.IP, srv.ApiPort),
 	}
 }
 
@@ -48,6 +48,11 @@ func (c *ApiClient) RegGet(device, regnum string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	if r.Response().StatusCode != 200 {
+		return "", errors.New(r.Response().Status)
+	}
+
 	reg := &srv.RegHex{}
 	err = r.ToJSON(reg)
 	if err != nil {
@@ -66,8 +71,9 @@ func (c *ApiClient) RegSet(device, regnum, regval string) error {
 	if err != nil {
 		return err
 	}
-	if ! (r.Response().StatusCode < 300 && r.Response().StatusCode >= 200) {
-		return errors.New(fmt.Sprintf("HTTP error: %s", r.Response().StatusCode))
+
+	if ! (r.Response().StatusCode != 200) {
+		return errors.New(r.Response().Status)
 	}
 	return nil
 }

@@ -15,9 +15,11 @@
 package reg
 
 import (
+	"fmt"
 	"github.com/spf13/cobra"
 	"jinr.ru/greenlab/go-adc/pkg/command"
 	"jinr.ru/greenlab/go-adc/pkg/config"
+	"os"
 )
 
 func NewGetCommand() *cobra.Command {
@@ -29,7 +31,12 @@ func NewGetCommand() *cobra.Command {
 		Short:         "Get reg value",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			apiClient := command.NewApiClient(cfg)
-			apiClient.RegGet(device, regNum)
+			regValue, err := apiClient.RegGet(device, regNum)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err.Error())
+				return nil
+			}
+			fmt.Printf("Register state: %s = %s\n", regNum, regValue)
 			return nil
 		},
 	}
