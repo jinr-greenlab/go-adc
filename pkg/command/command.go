@@ -42,6 +42,10 @@ func (c *ApiClient) regSetUrl(device string) string {
 	return fmt.Sprintf("%s/reg/set/%s", c.ApiPrefix, device)
 }
 
+func (c *ApiClient) mstreamUrl(action, device string) string {
+	return fmt.Sprintf("%s/mstream/%s/%s", c.ApiPrefix, action, device)
+}
+
 // RegGet low level api request to get the value of a register for a device
 func (c *ApiClient) RegGet(device, regnum string) (string, error) {
 	r, err := req.Get(c.regGetUrl(device, regnum))
@@ -68,6 +72,19 @@ func (c *ApiClient) RegSet(device, regnum, regval string) error {
 		RegValue: regval,
 	}
 	r, err := req.Post(c.regSetUrl(device), req.BodyJSON(reg))
+	if err != nil {
+		return err
+	}
+
+	if ! (r.Response().StatusCode != 200) {
+		return errors.New(r.Response().Status)
+	}
+	return nil
+}
+
+// MStream low level api request to start/stop streaming for a device
+func (c *ApiClient) MStream(action, device string) error {
+	r, err := req.Get(c.mstreamUrl(action, device))
 	if err != nil {
 		return err
 	}

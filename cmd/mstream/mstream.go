@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	DeviceIPOptionName = "device-ip"
+	DeviceOptionName = "device"
 )
 
 func NewCommand() *cobra.Command {
@@ -28,9 +28,9 @@ func NewCommand() *cobra.Command {
 		Short:         "Interact with devices using reg interface",
 	}
 
-	cmd.AddCommand(NewStartDevicesCommand())
-	cmd.AddCommand(NewStopDevicesCommand())
-	cmd.AddCommand(NewStartServerCommand())
+	cmd.AddCommand(NewStreamCommand())
+	cmd.AddCommand(NewUnstreamCommand())
+	cmd.AddCommand(NewStartCommand())
 
 	return cmd
 }

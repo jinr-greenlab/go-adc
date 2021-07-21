@@ -15,25 +15,32 @@
 package mstream
 
 import (
+	"fmt"
 	"github.com/spf13/cobra"
+	"jinr.ru/greenlab/go-adc/pkg/command"
 	"jinr.ru/greenlab/go-adc/pkg/config"
+	"jinr.ru/greenlab/go-adc/pkg/srv"
+	"os"
 )
 
-func NewStopDevicesCommand() *cobra.Command {
+func NewStreamCommand() *cobra.Command {
+	var device string
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "stop-devices",
-		Short:         "Stop MStream on all devices",
+		Use:           "stream",
+		Short:         "Start MStream for device",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			//regrw, err := adccmd.NewRegRW(cfg)
-			//if err != nil {
-			//	return err
-			//}
-			//regrw.StopMStream()
+			apiClient := command.NewApiClient(cfg)
+			err := apiClient.MStream(srv.MStreamActionStart, device)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, err.Error())
+				return nil
+			}
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&device, DeviceOptionName, "", "Device name")
 
 	return cmd
 }

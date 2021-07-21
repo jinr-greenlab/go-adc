@@ -37,7 +37,10 @@ func (s *RegServer) configureRouter() {
 	// regnum and regval must be hexadecimal integers
 	subRouter.HandleFunc("/reg/get/{device}/{regnum:0x[0-9abcdef]{4}}", s.handleRegGet()).Methods("GET")
 	subRouter.HandleFunc("/reg/set/{device}", s.handleRegSet()).Methods("POST")
-	subRouter.HandleFunc("/mstream/{device}/{action}", s.handleMStreamAction()).Methods("GET")
+	subRouter.HandleFunc("/mstream/{action}/{device}", s.handleMStreamAction()).Methods("GET")
+	subRouter.HandleFunc("/reg/get/{device}/all", s.handleRegGetAll()).Methods("GET")
+	subRouter.HandleFunc("/reg/r/{device}/all", s.handleRegReadFromDevice()).Methods("GET")
+	subRouter.HandleFunc("/reg/w/{device}/all", s.handleRegWriteToDevice()).Methods("GET")
 }
 
 func (s *RegServer) handleRegGet() http.HandlerFunc {
@@ -62,6 +65,18 @@ func (s *RegServer) handleRegGet() http.HandlerFunc {
 			RegValue: fmt.Sprintf("%x", regValue),
 		})
 	}
+}
+
+func (s *RegServer) handleRegGetAll() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {}
+}
+
+func (s *RegServer) handleRegReadFromDevice() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {}
+}
+
+func (s *RegServer) handleRegWriteToDevice() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {}
 }
 
 func (s *RegServer) handleRegSet() http.HandlerFunc {
