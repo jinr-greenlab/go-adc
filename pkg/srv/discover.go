@@ -63,7 +63,7 @@ func NewDiscoverServer(cfg *config.Config) (*DiscoverServer, error) {
 		Server: Server{
 			Context: context.Background(),
 			UDPAddr: uaddr,
-			chCaptured: make(chan Captured),
+			ChIn: make(chan InPacket),
 			Config: cfg,
 		},
 		Interface: iface,
@@ -123,7 +123,7 @@ func (s *DiscoverServer) Run() error {
 				return
 			}
 
-			ci := gopacket.CaptureInfo{
+			captureInfo := gopacket.CaptureInfo{
 				Length: length,
 				CaptureLength: length,
 				InterfaceIndex: s.Interface.Index,
@@ -131,7 +131,7 @@ func (s *DiscoverServer) Run() error {
 				AncillaryData: []interface{}{udpAddr},
 			}
 
-			s.chCaptured <- Captured{Data: buffer[:length], CaptureInfo: ci}
+			s.ChIn <- InPacket{Data: buffer[:length], CaptureInfo: captureInfo}
 		}
 	}()
 

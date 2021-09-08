@@ -18,18 +18,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	DeviceOptionName = "device"
-)
-
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "mstream",
-		Short:         "Interact with devices using reg interface",
+		Short:         "MStream subcommand",
 	}
 
-	cmd.AddCommand(NewStreamCommand())
-	cmd.AddCommand(NewUnstreamCommand())
 	cmd.AddCommand(NewStartCommand())
 
 	return cmd

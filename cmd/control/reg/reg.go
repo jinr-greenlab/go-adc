@@ -20,19 +20,16 @@ import (
 
 const (
 	DeviceOptionName = "device"
-	RegNumOptionName = "regnum"
-	RegValueOptionName = "regval"
+	AddrOptionName = "addr"
+	ValueOptionName = "value"
 )
 
-func NewCommand() *cobra.Command {
+func NewRegCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "reg",
-		Short:         "Interact with devices using reg interface",
+		Short:         "Low level control by means of reading from/writing to registers",
 	}
-
-	cmd.AddCommand(NewGetCommand())
-	cmd.AddCommand(NewSetCommand())
-	cmd.AddCommand(NewStartCommand())
-
+	cmd.AddCommand(NewReadCommand())
+	cmd.AddCommand(NewWriteCommand())
 	return cmd
 }

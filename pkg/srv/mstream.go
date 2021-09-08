@@ -48,8 +48,8 @@ func NewMStreamServer(cfg *config.Config) (*MStreamServer, error) {
 			Context:    context.Background(),
 			Config:     cfg,
 			UDPAddr:    uaddr,
-			chCaptured: make(chan Captured),
-			chSend:     make(chan Send),
+			ChIn:       make(chan InPacket),
+			ChOut:      make(chan OutPacket),
 		},
 	}
 
@@ -114,24 +114,24 @@ func (s *MStreamServer) Run() error {
 				errChan <- readErr
 				return
 			}
-			ci := gopacket.CaptureInfo{
+			captureInfo := gopacket.CaptureInfo{
 				Length: length,
 				CaptureLength: length,
 				Timestamp: time.Now(),
 				AncillaryData: []interface{}{udpAddr},
 			}
 
-			s.chCaptured <- Captured{Data: buffer[:length], CaptureInfo: ci}
+			s.ChIn <- InPacket{Data: buffer[:length], CaptureInfo: captureInfo}
 		}
 	}()
 
 	// read data from the chSend channel and send them to the wire
 	go func() {
 		for {
-			send := <-s.chSend
-			_, sendErr := conn.WriteToUDP(send.Data, send.UDPAddr)
+			outPacket := <-s.ChOut
+			_, sendErr := conn.WriteToUDP(outPacket.Data, outPacket.UDPAddr)
 			if sendErr != nil {
-				log.Error("Error while sending data to %s", send.UDPAddr)
+				log.Error("Error while sending data to %s", outPacket.UDPAddr)
 				errChan <- sendErr
 				return
 			}
@@ -180,7 +180,7 @@ func (s *MStreamServer) SendAck(fragmentID, fragmentOffset uint16, udpAddr *net.
 		return err
 	}
 
-	s.chSend <- Send{
+	s.ChOut <- OutPacket{
 		Data: buf.Bytes(),
 		UDPAddr: udpAddr,
 	}

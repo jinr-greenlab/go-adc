@@ -83,7 +83,7 @@ func (c *Config) GetDeviceByName(name string) (*Device, error) {
 }
 
 // GetDeviceByIP ...
-func (c *Config) GetDeviceByIP(ip *net.IP) (*Device, error) {
+func (c *Config) GetDeviceByIP(ip net.IP) (*Device, error) {
 	for i, device := range c.Devices {
 		if device.IP.String() == ip.String() {
 			return c.Devices[i], nil

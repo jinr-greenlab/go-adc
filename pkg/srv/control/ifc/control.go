@@ -12,19 +12,17 @@
  limitations under the License.
 */
 
-package discover
+package ifc
 
-import (
-	"github.com/spf13/cobra"
-)
+import "jinr.ru/greenlab/go-adc/pkg/layers"
 
-func NewCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:           "discover",
-		Short:         "Discover subcommand",
-	}
-
-	cmd.AddCommand(NewStartCommand())
-
-	return cmd
+type ControlServer interface {
+	RegRead(addr uint16, device string) (*layers.Reg, error)
+	RegReadAll(device string) ([]*layers.Reg, error)
+	RegWrite(reg *layers.Reg, device string) error
+	MStreamStart(device string) error
+	MStreamStop(device string) error
+	MStreamStartAll() error
+	MStreamStopAll() error
+	Run() error
 }

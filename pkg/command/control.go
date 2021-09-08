@@ -12,19 +12,21 @@
  limitations under the License.
 */
 
-package discover
+package command
 
 import (
-	"github.com/spf13/cobra"
+	"context"
+	"jinr.ru/greenlab/go-adc/pkg/config"
+	"jinr.ru/greenlab/go-adc/pkg/srv/control"
 )
 
-func NewCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:           "discover",
-		Short:         "Discover subcommand",
+// StartControlServer ...
+func StartControlServer(cfg *config.Config) error {
+	ctx := context.Background()
+
+	s, err := control.NewControlServer(ctx, cfg)
+	if err != nil {
+		return err
 	}
-
-	cmd.AddCommand(NewStartCommand())
-
-	return cmd
+	return s.Run()
 }

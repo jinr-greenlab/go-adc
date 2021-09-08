@@ -12,36 +12,47 @@
  limitations under the License.
 */
 
-package mstream
+package discover
 
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	"jinr.ru/greenlab/go-adc/pkg/command"
+	"net"
+
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/srv"
-	"os"
 )
 
-func NewUnstreamCommand() *cobra.Command {
-	var device string
+const (
+	IPOptionName = "ip"
+	IfaceOptionName = "iface"
+)
+
+func NewStartCommand() *cobra.Command {
+	var ip, iface string
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "unstream",
-		Short:         "Stop MStream for device",
+		Use:           "discover",
+		Short:         "Start discover server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			apiClient := command.NewApiClient(cfg)
-			err := apiClient.MStream(srv.MStreamActionStop, device)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err.Error())
-				return nil
+			if ip != "" {
+				parsedIP := net.ParseIP(ip)
+				cfg.DiscoverIP = &parsedIP
 			}
-			return nil
-			return nil
+			if iface != "" {
+				cfg.DiscoverIface = iface
+			}
+			s, err := srv.NewDiscoverServer(cfg)
+			if err != nil {
+				return err
+			}
+			return s.Run()
 		},
 	}
-	cmd.Flags().StringVar(&device, DeviceOptionName, "", "Device name")
+	cmd.Flags().StringVar(&ip, IPOptionName, "", fmt.Sprintf("IP to bind. E.g. %s", config.DefaultDiscoverIP))
+	cmd.Flags().StringVar(&iface, IfaceOptionName, "",
+		fmt.Sprintf("Interface name to listen on. E.g. %s", config.DefaultDiscoverIface))
 
 	return cmd
 }

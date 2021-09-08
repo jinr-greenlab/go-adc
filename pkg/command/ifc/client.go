@@ -12,19 +12,14 @@
  limitations under the License.
 */
 
-package discover
+package ifc
 
-import (
-	"github.com/spf13/cobra"
-)
-
-func NewCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:           "discover",
-		Short:         "Discover subcommand",
-	}
-
-	cmd.AddCommand(NewStartCommand())
-
-	return cmd
+type ApiClient interface {
+	RegRead(device, addr string) (string, error)
+	RegReadAll(device string) (map[string]string, error)
+	RegWrite(device, addr, value string) error
+	MStreamStart(device string) error
+	MStreamStop(device string) error
+	MStreamStartAll() error
+	MStreamStopAll() error
 }

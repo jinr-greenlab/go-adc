@@ -15,32 +15,33 @@
 package reg
 
 import (
-	"fmt"
-	"os"
 	"github.com/spf13/cobra"
 	"jinr.ru/greenlab/go-adc/pkg/command"
 	"jinr.ru/greenlab/go-adc/pkg/config"
 )
 
-func NewSetCommand() *cobra.Command {
-	var device, regNum, regValue string
+func NewWriteCommand() *cobra.Command {
+	var device, addr, value string
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "set",
-		Short:         "Set reg value",
+		Use:           "write",
+		Short:         "Write value to register",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			apiClient := command.NewApiClient(cfg)
-			err := apiClient.RegSet(device, regNum, regValue)
+			err := apiClient.RegWrite(device, addr, value)
 			if err != nil {
-				fmt.Fprintln(os.Stderr, err.Error())
+				return err
 			}
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&device, DeviceOptionName, "", "Device name")
-	cmd.Flags().StringVar(&regNum, RegNumOptionName, "", "Register address (hexadecimal)")
-	cmd.Flags().StringVar(&regValue, RegValueOptionName, "", "Register value (hexadecimal)")
+	cmd.MarkFlagRequired(DeviceOptionName)
+	cmd.Flags().StringVar(&addr, AddrOptionName, "", "Register address (hexadecimal)")
+	cmd.MarkFlagRequired(AddrOptionName)
+	cmd.Flags().StringVar(&value, ValueOptionName, "", "Register value (hexadecimal)")
+	cmd.MarkFlagRequired(ValueOptionName)
 
 	return cmd
 }

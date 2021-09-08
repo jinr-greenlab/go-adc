@@ -12,19 +12,8 @@
  limitations under the License.
 */
 
-package discover
+package ifc
 
-import (
-	"github.com/spf13/cobra"
-)
-
-func NewCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:           "discover",
-		Short:         "Discover subcommand",
-	}
-
-	cmd.AddCommand(NewStartCommand())
-
-	return cmd
+type ApiServer interface {
+	Run() error
 }

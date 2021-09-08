@@ -18,9 +18,27 @@ import (
 	"fmt"
 )
 
-// ErrGetAddr returned when we can not get the address and port of the devices that sent a packet
+// ErrGetAddr returned when we can not get the address and port of the device that sent a packet
 type ErrGetAddr struct {}
 
 func (e ErrGetAddr) Error() string {
 	return fmt.Sprintf("Error while getting device address and port")
+}
+
+// ErrGetDeviceName returned when we can not get the name of the device that sent a packet
+type ErrGetDeviceName struct {
+	What string
+}
+
+func (e ErrGetDeviceName) Error() string {
+	return fmt.Sprintf("Error while getting device name: %s", e.What)
+}
+
+// ErrUnknownOperation returned when unknown operation is being applied to a device
+type ErrUnknownOperation struct {
+	What string
+}
+
+func (e ErrUnknownOperation) Error() string {
+	return fmt.Sprintf("Unknown operation: %s", e.What)
 }

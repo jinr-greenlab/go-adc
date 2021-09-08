@@ -12,18 +12,25 @@
  limitations under the License.
 */
 
-package discover
+package control
 
 import (
 	"github.com/spf13/cobra"
+	"jinr.ru/greenlab/go-adc/cmd/control/reg"
+)
+
+const (
+	DeviceOptionName = "device"
 )
 
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "discover",
-		Short:         "Discover subcommand",
+		Use:           "control",
+		Short:         "Control subcommand",
 	}
 
+	cmd.AddCommand(reg.NewRegCommand())
+	cmd.AddCommand(NewMStreamCommand())
 	cmd.AddCommand(NewStartCommand())
 
 	return cmd

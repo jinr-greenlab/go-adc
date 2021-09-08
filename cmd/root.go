@@ -18,9 +18,10 @@ import (
 	"github.com/spf13/cobra"
 	"io"
 	"jinr.ru/greenlab/go-adc/cmd/config"
+	"jinr.ru/greenlab/go-adc/cmd/control"
 	"jinr.ru/greenlab/go-adc/cmd/discover"
 	"jinr.ru/greenlab/go-adc/cmd/mstream"
-	"jinr.ru/greenlab/go-adc/cmd/reg"
+	"jinr.ru/greenlab/go-adc/cmd/completion"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
@@ -33,9 +34,10 @@ func NewRootCommand(out io.Writer) (*cobra.Command) {
 		},
 	}
 	cmd.SetOut(out)
+	cmd.AddCommand(config.NewCommand())
+	cmd.AddCommand(control.NewCommand())
 	cmd.AddCommand(discover.NewCommand())
 	cmd.AddCommand(mstream.NewCommand())
-	cmd.AddCommand(config.NewCommand())
-	cmd.AddCommand(reg.NewCommand())
+	cmd.AddCommand(completion.NewCommand())
 	return cmd
 }

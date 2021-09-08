@@ -16,38 +16,41 @@ package reg
 
 import (
 	"fmt"
-	"net"
-
 	"github.com/spf13/cobra"
-
+	"jinr.ru/greenlab/go-adc/pkg/command"
 	"jinr.ru/greenlab/go-adc/pkg/config"
-	"jinr.ru/greenlab/go-adc/pkg/srv"
 )
 
-const (
-	IPOptionName = "ip"
-)
-
-func NewStartCommand() *cobra.Command {
-	var ip string
+func NewReadCommand() *cobra.Command {
+	var device, addr string
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "start",
-		Short:         "Start reg server",
+		Use:           "read",
+		Short:         "Read value from register",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if ip != "" {
-				parsedIP := net.ParseIP(ip)
-				cfg.IP = &parsedIP
+			apiClient := command.NewApiClient(cfg)
+			if addr != "" {
+				value, err := apiClient.RegRead(device, addr)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("Register state: %s = %s\n", addr, value)
+				return nil
 			}
-			server, err := srv.NewRegServer(cfg)
+			regs, err := apiClient.RegReadAll(device)
 			if err != nil {
 				return err
 			}
-			return server.Run()
+			for addr, value := range regs {
+				fmt.Printf("Register state: %s = %s\n", addr, value)
+			}
+			return nil
 		},
 	}
-	cmd.Flags().StringVar(&ip, IPOptionName, "", fmt.Sprintf("IP to bind. E.g. %s", config.DefaultIP))
+	cmd.Flags().StringVar(&device, DeviceOptionName, "", "Device name")
+	cmd.MarkFlagRequired(DeviceOptionName)
+	cmd.Flags().StringVar(&addr, AddrOptionName, "", "Register address (hexadecimal)")
 
 	return cmd
 }

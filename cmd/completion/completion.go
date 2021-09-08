@@ -12,19 +12,32 @@
  limitations under the License.
 */
 
-package discover
+package completion
 
 import (
 	"github.com/spf13/cobra"
 )
 
+const (
+
+	completionExample = `
+Save shell completion to a file
+# go-adc completion > $HOME/.go-adc_completions
+
+Apply completions to the current bash instance
+# source <(go-adc completion)
+`
+)
+
+// NewCommand creates a cobra command object for generating bash completion script
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "discover",
-		Short:         "Discover subcommand",
+		Use:       "completion",
+		Short:     "Generate completion script for bash",
+		Example:   completionExample,
+		RunE:      func(cmd *cobra.Command, args []string) error {
+			return cmd.Root().GenBashCompletion(cmd.OutOrStdout())
+		},
 	}
-
-	cmd.AddCommand(NewStartCommand())
-
 	return cmd
 }

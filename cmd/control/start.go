@@ -12,35 +12,36 @@
  limitations under the License.
 */
 
-package mstream
+package control
 
 import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"jinr.ru/greenlab/go-adc/pkg/command"
 	"jinr.ru/greenlab/go-adc/pkg/config"
-	"jinr.ru/greenlab/go-adc/pkg/srv"
-	"os"
+	"net"
 )
 
-func NewStreamCommand() *cobra.Command {
-	var device string
+const (
+	IPOptionName = "ip"
+)
+
+func NewStartCommand() *cobra.Command {
+	var ip string
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "stream",
-		Short:         "Start MStream for device",
+		Use:           "start",
+		Short:         "Start control server",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			apiClient := command.NewApiClient(cfg)
-			err := apiClient.MStream(srv.MStreamActionStart, device)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, err.Error())
-				return nil
+			if ip != "" {
+				parsedIP := net.ParseIP(ip)
+				cfg.IP = &parsedIP
 			}
-			return nil
+			return command.StartControlServer(cfg)
 		},
 	}
-	cmd.Flags().StringVar(&device, DeviceOptionName, "", "Device name")
+	cmd.Flags().StringVar(&ip, IPOptionName, "", fmt.Sprintf("IP to bind. E.g. %s", config.DefaultIP))
 
 	return cmd
 }

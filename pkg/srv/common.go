@@ -16,7 +16,6 @@ package srv
 
 import (
 	"context"
-	"errors"
 	"net"
 
 	"github.com/google/gopacket"
@@ -24,12 +23,12 @@ import (
 	"jinr.ru/greenlab/go-adc/pkg/config"
 )
 
-type Captured struct {
+type InPacket struct {
 	Data []byte
 	gopacket.CaptureInfo
 }
 
-type Send struct {
+type OutPacket struct {
 	Data []byte
 	*net.UDPAddr
 }
@@ -55,26 +54,26 @@ func GetDeviceName(packet gopacket.Packet) (string, error) {
 		ancillary := meta.CaptureInfo.AncillaryData[1]
 		deviceName, ok := ancillary.(string)
 		if !ok {
-			return "", errors.New("Error while getting device name: can not cast to string")
+			return "", ErrGetDeviceName{What: "can not cast ancillary data to string"}
 		}
 		return deviceName, nil
 	}
-	return "", errors.New("Error while getting device name: not enough ancillary data")
+	return "", ErrGetDeviceName{What: "not enough ancillary data"}
 }
 
 type Server struct {
 	context.Context
 	*config.Config
 	*net.UDPAddr
-	chCaptured chan Captured
-	chSend chan Send
+	ChIn chan InPacket
+	ChOut chan OutPacket
 }
 
 // ReadPacketData reads chCaptured channel and returns packet data and metadata.
 // This method is from PacketDataSource interface.
-func (s *Server) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error) {
-	captured := <-s.chCaptured
-	data = captured.Data
-	ci = captured.CaptureInfo
+func (s *Server) ReadPacketData() (data []byte, captureInfo gopacket.CaptureInfo, err error) {
+	packet := <-s.ChIn
+	data = packet.Data
+	captureInfo = packet.CaptureInfo
 	return
 }
