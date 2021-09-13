@@ -33,7 +33,7 @@ func NewStartCommand() *cobra.Command {
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "discover",
+		Use:           "start",
 		Short:         "Start discover server",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if ip != "" {

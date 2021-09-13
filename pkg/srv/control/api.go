@@ -205,7 +205,7 @@ func (s *ApiServer) handleMStreamAction() http.HandlerFunc {
 func (s *ApiServer) handleMStreamActionAll() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		log.Debug("Handling MStream action request: device: %s action: %s", vars["device"], vars["action"])
+		log.Debug("Handling MStream action request for all devices: action: %s", vars["action"])
 		switch vars["action"] {
 		case ActionStart:
 			err := s.ctrl.MStreamStartAll()

@@ -28,6 +28,8 @@ type ApiClient struct {
 	ApiPrefix string
 }
 
+var _ ifc.ApiClient = &ApiClient{}
+
 func NewApiClient(cfg *config.Config) ifc.ApiClient {
 	return &ApiClient{
 		Config: cfg,
