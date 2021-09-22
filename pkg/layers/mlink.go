@@ -92,6 +92,7 @@ func initUnknownMLinkTypes() {
 func initActualMLinkTypes() {
 	MLinkMetadata[MLinkTypeMStream] = layers.EnumMetadata{DecodeWith: gopacket.DecodeFunc(DecodeMStreamLayer), Name: "MStream", LayerType: MStreamLayerType}
 	MLinkMetadata[MLinkTypeRegResponse] = layers.EnumMetadata{DecodeWith: gopacket.DecodeFunc(DecodeRegLayer), Name: "Reg", LayerType: RegLayerType}
+	MLinkMetadata[MLinkTypeMemResponse] = layers.EnumMetadata{DecodeWith: gopacket.DecodeFunc(DecodeMemLayer), Name: "Mem", LayerType: MemLayerType}
 }
 
 // LayerType returns MLinkMetadata.LayerType

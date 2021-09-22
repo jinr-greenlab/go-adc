@@ -7,6 +7,6 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/imroc/req v0.3.0
 	github.com/spf13/cobra v1.1.3
-	go.etcd.io/bbolt v1.3.6 // indirect
+	go.etcd.io/bbolt v1.3.6
 	sigs.k8s.io/yaml v1.2.0
 )

@@ -16,9 +16,11 @@ package control
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"github.com/google/gopacket"
-	"hash/crc32"
+	pkgdevice "jinr.ru/greenlab/go-adc/pkg/device"
+	deviceifc "jinr.ru/greenlab/go-adc/pkg/device/ifc"
 	"jinr.ru/greenlab/go-adc/pkg/srv/control/ifc"
 	"net"
 	"strings"
@@ -32,13 +34,15 @@ import (
 
 const (
 	RegPort = 33300
+	RegReadInterval = 10
 )
 
 type ControlServer struct {
 	srv.Server
 	seq uint16
-	state *RegState
+	state ifc.State
 	api ifc.ApiServer
+	devices map[string]*pkgdevice.Device
 }
 
 var _ ifc.ControlServer = &ControlServer{}
@@ -52,7 +56,7 @@ func NewControlServer(ctx context.Context, cfg *config.Config) (ifc.ControlServe
 		return nil, err
 	}
 
-	regState, err := NewRegState(ctx, cfg)
+	state, err := NewState(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -66,8 +70,18 @@ func NewControlServer(ctx context.Context, cfg *config.Config) (ifc.ControlServe
 			ChOut:   make(chan srv.OutPacket),
 		},
 		seq: 0,
-		state: regState,
+		state: state,
 	}
+
+	devices := make(map[string]*pkgdevice.Device)
+	for _, cfgDevice := range cfg.Devices {
+		device, err := pkgdevice.NewDevice(cfgDevice, s, state)
+		if err != nil {
+			return nil, err
+		}
+		devices[cfgDevice.Name] = device
+	}
+	s.devices = devices
 
 	apiServer, err := NewApiServer(ctx, cfg, s)
 	if err != nil {
@@ -103,6 +117,7 @@ func (s *ControlServer) Run() error {
 				errChan <- readErr
 				return
 			}
+			log.Debug("Received packet from %s", udpAddr)
 			ipAddr := net.ParseIP(strings.Split(addr.String(), ":")[0])
 			device, err := s.GetDeviceByIP(ipAddr)
 			if err != nil {
@@ -121,22 +136,35 @@ func (s *ControlServer) Run() error {
 		}
 	}()
 
-	// Read captured packets from input queue, parse them and update the state
+	// Read captured packets from input queue, parse them and update the device state
 	go func() {
 		source := gopacket.NewPacketSource(s, layers.MLinkLayerType)
 		for packet := range source.Packets() {
-			log.Debug("Packet received")
 			deviceName, packetErr := srv.GetDeviceName(packet)
 			if packetErr != nil {
 				log.Error(packetErr.Error())
 				continue
 			}
-			reg := packet.Layer(layers.RegLayerType)
-			if reg != nil {
-				log.Debug("Packet parsed")
-				reg := reg.(*layers.RegLayer)
-				for _, op := range reg.RegOps {
-					s.state.SetReg(op.Reg, deviceName)
+			log.Debug("Recieved packet from device: %s packet: %s", deviceName, hex.EncodeToString(packet.Data()))
+			log.Debug(packet.Dump())
+			device, ok := s.devices[deviceName]
+			if ! ok {
+				log.Error("Packet unknown device: %s", deviceName)
+				continue
+			}
+			layer := packet.Layer(layers.RegLayerType)
+			if layer != nil {
+				layer, ok := layer.(*layers.RegLayer)
+				if !ok {
+					log.Error("Error while asserting to RegLayer")
+					continue
+				}
+				for _, op := range layer.RegOps {
+					err := device.UpdateReg(op.Reg)
+					if err != nil {
+						log.Error("Fail to update device: device = %s", deviceName)
+						continue
+					}
 				}
 			}
 		}
@@ -146,6 +174,7 @@ func (s *ControlServer) Run() error {
 	go func() {
 		for {
 			outPacket := <-s.ChOut
+			log.Debug("Sending packet to %s", outPacket.UDPAddr)
 			_, sendErr := conn.WriteToUDP(outPacket.Data, outPacket.UDPAddr)
 			if sendErr != nil {
 				log.Error("Error while sending data to %s", outPacket.UDPAddr)
@@ -159,6 +188,25 @@ func (s *ControlServer) Run() error {
 		s.api.Run()
 	}()
 
+	// Periodically read all registers from all devices
+	go func() {
+		for {
+			time.Sleep(RegReadInterval * time.Second)
+			var ops []*layers.RegOp
+			for i := pkgdevice.RegAlias(0); i < pkgdevice.RegAliasLimit; i++ {
+				addr := pkgdevice.RegMap[i]
+				ops = append(ops, &layers.RegOp{Read: true, Reg: &layers.Reg{Addr: addr}})
+			}
+			for _, device := range s.devices {
+				err := s.RegRequest(ops, device.IP)
+				if err != nil {
+					log.Error("Error while sending reg request to device %s", device.IP)
+				}
+			}
+		}
+	}()
+
+
 	select {
 	case <-s.Context.Done():
 		return s.Context.Err()
@@ -167,182 +215,81 @@ func (s *ControlServer) Run() error {
 	}
 }
 
+// NextSeq ...
 func (s *ControlServer) NextSeq() uint16 {
 	seq := s.seq; s.seq++; return seq
 }
 
-
-func (s *ControlServer) RegRequest(ops []*layers.RegOp, deviceName string) error {
-	device, err := s.Config.GetDeviceByName(deviceName)
+// RegRequest ...
+func (s *ControlServer) RegRequest(ops []*layers.RegOp, IP *net.IP) error {
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", IP, RegPort))
 	if err != nil {
 		return err
 	}
-
-	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", device.IP, RegPort))
-	if err != nil {
-		return err
-	}
-
-	ml := &layers.MLinkLayer{}
-	ml.Type = layers.MLinkTypeRegRequest
-	ml.Sync = layers.MLinkSync
-	// 3 words for MLink header + 1 word CRC + N words for request
-	ml.Len = uint16(4 + len(ops))
-	ml.Seq = s.NextSeq()
-	ml.Src = layers.MLinkHostAddr
-	ml.Dst = layers.MLinkDeviceAddr
-
-	// Calculate crc32 checksum
-	mlHeaderBytes := make([]byte, 12)
-	ml.SerializeHeader(mlHeaderBytes)
-
-	reg := &layers.RegLayer{}
-	reg.RegOps = ops
-	regBytes := make([]byte, len(ops) * 4)
-	reg.Serialize(regBytes)
-
-	ml.Crc = crc32.ChecksumIEEE(append(mlHeaderBytes, regBytes...))
-
-	buf := gopacket.NewSerializeBuffer()
-	opts := gopacket.SerializeOptions{}
-	err = gopacket.SerializeLayers(buf, opts, ml, reg)
+	bytes, err := layers.RegOpsToBytes(ops, s.NextSeq())
 	if err != nil {
 		log.Error("Error while serializing layers when sending register r/w request to %s", udpAddr)
 		return err
 	}
-
+	log.Debug("Put Reg request to queue: udpaddr: %s request: %s", udpAddr, hex.EncodeToString(bytes))
 	s.ChOut <- srv.OutPacket{
-		Data: buf.Bytes(),
+		Data: bytes,
 		UDPAddr: udpAddr,
 	}
 	return nil
 }
 
-func (s *ControlServer) MemRequest(op *layers.MemOp, deviceName string) error {
-	device, err := s.Config.GetDeviceByName(deviceName)
+// MemRequest ...
+func (s *ControlServer) MemRequest(op *layers.MemOp, IP *net.IP) error {
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", IP, RegPort))
 	if err != nil {
 		return err
 	}
-
-	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", device.IP, RegPort))
-	if err != nil {
-		return err
-	}
-
-	ml := &layers.MLinkLayer{}
-	ml.Type = layers.MLinkTypeMemRequest
-	ml.Sync = layers.MLinkSync
-	// 3 words for MLink header + 1 word CRC + 1 word MemOp header + N words MemOp data
-	ml.Len = uint16(4 + op.Size + 1)
-	ml.Seq = s.NextSeq()
-	ml.Src = layers.MLinkHostAddr
-	ml.Dst = layers.MLinkDeviceAddr
-
-	// Calculate crc32 checksum
-	mlHeaderBytes := make([]byte, 12)
-	ml.SerializeHeader(mlHeaderBytes)
-
-	mem := &layers.MemLayer{}
-	mem.MemOp = op
-	memBytes := make([]byte, (1 + op.Size) * 4)
-	mem.Serialize(memBytes)
-
-	ml.Crc = crc32.ChecksumIEEE(append(mlHeaderBytes, memBytes...))
-
-	buf := gopacket.NewSerializeBuffer()
-	opts := gopacket.SerializeOptions{}
-	err = gopacket.SerializeLayers(buf, opts, ml, mem)
+	bytes, err := layers.MemOpToBytes(op, s.NextSeq())
 	if err != nil {
 		log.Error("Error while serializing layers when sending memory r/w request to %s", udpAddr)
 		return err
 	}
-
 	s.ChOut <- srv.OutPacket{
-		Data: buf.Bytes(),
+		Data: bytes,
 		UDPAddr: udpAddr,
 	}
 	return nil
 }
 
-
-func (s *ControlServer) RegRead(addr uint16, device string) (*layers.Reg, error) {
-	return s.state.GetReg(addr, device)
-}
-
-func (s *ControlServer) RegReadAll(device string) ([]*layers.Reg, error) {
-	return s.state.GetRegAll(device)
-}
-
-func (s *ControlServer) RegWrite(reg *layers.Reg, device string) error {
-	ops := []*layers.RegOp{
-		{
-			Read: false,
-			Reg: reg,
-		},
+// GetDeviceByName ...
+func (s *ControlServer) GetDeviceByName(deviceName string) (deviceifc.Device, error) {
+	device, ok := s.devices[deviceName]
+	if ! ok {
+		return nil, srv.ErrDeviceNotFound{What: deviceName}
 	}
-	return s.RegRequest(ops, device)
+	return device, nil
 }
 
-// for details how to start and stop streaming data see DominoDevice::writeSettings()
-
-// MStreamStart ...
-func (s *ControlServer) MStreamStart(device string) error {
-	var ops []*layers.RegOp
-	ops = []*layers.RegOp{
-		{
-			Reg: &layers.Reg{
-				Addr:  RegMap[RegCtrl],
-				Value: 0,
-			},
-		},
-		{
-			Reg: &layers.Reg{
-				Addr:  RegMap[RegCtrl],
-				Value: 0x8000,
-			},
-		},
+// GetAllDevices ...
+func (s *ControlServer) GetAllDevices() map[string]deviceifc.Device {
+	result := make(map[string]deviceifc.Device)
+	for n, d := range s.devices {
+		result[n] = d
 	}
-
-	return s.RegRequest(ops, device)
+	return result
 }
 
-// MStreamStartAll ...
-func (s *ControlServer) MStreamStartAll() error {
-	for _, d := range s.Devices {
-		err := s.MStreamStart(d.Name)
-		if err != nil {
-			return err
-		}
+// RegRequestByDeviceName ...
+func (s *ControlServer) RegRequestByDeviceName(ops []*layers.RegOp, deviceName string) error {
+	device, err := s.Config.GetDeviceByName(deviceName)
+	if err != nil {
+		return err
 	}
-	return nil
+	return s.RegRequest(ops, device.IP)
 }
 
-// MStreamStop ...
-func (s *ControlServer) MStreamStop(deviceName string) error {
-	ops := []*layers.RegOp{
-		{
-			Reg: &layers.Reg{
-				Addr:  RegMap[RegCtrl],
-				Value: 1,
-			},
-		},
-		{
-			Reg: &layers.Reg{
-				Addr: RegMap[RegCtrl],
-				Value: 0,
-			},
-		},
+// RegRequestByDeviceName ...
+func (s *ControlServer) MemRequestByDeviceName(op *layers.MemOp, deviceName string) error {
+	device, err := s.Config.GetDeviceByName(deviceName)
+	if err != nil {
+		return err
 	}
-	return s.RegRequest(ops, deviceName)
+	return s.MemRequest(op, device.IP)
 }
 
-// MStreamStopAll ...
-func (s *ControlServer) MStreamStopAll() error {
-	for _, d := range s.Devices {
-		err := s.MStreamStop(d.Name)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}

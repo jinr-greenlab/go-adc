@@ -42,3 +42,12 @@ type ErrUnknownOperation struct {
 func (e ErrUnknownOperation) Error() string {
 	return fmt.Sprintf("Unknown operation: %s", e.What)
 }
+
+// ErrDeviceNotFound returned when there is no requested device
+type ErrDeviceNotFound struct {
+	What string
+}
+
+func (e ErrDeviceNotFound) Error() string {
+	return fmt.Sprintf("Device not found: %s", e.What)
+}

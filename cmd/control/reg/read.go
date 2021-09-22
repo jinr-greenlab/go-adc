@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/cobra"
 	"jinr.ru/greenlab/go-adc/pkg/command"
 	"jinr.ru/greenlab/go-adc/pkg/config"
+	"sort"
 )
 
 func NewReadCommand() *cobra.Command {
@@ -42,8 +43,13 @@ func NewReadCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			for addr, value := range regs {
-				fmt.Printf("Register state: %s = %s\n", addr, value)
+			var keys []string
+			for key := range regs {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			for _, key := range keys {
+				fmt.Printf("Register state: %s = %s\n", key, regs[key])
 			}
 			return nil
 		},

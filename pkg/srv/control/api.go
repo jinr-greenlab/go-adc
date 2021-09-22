@@ -61,7 +61,11 @@ func NewApiServer(ctx context.Context, cfg *config.Config, ctrl ifc.ControlServe
 }
 
 func (s *ApiServer) regReadHex(addr uint16, device string) (*RegHex, error) {
-	reg, err := s.ctrl.RegRead(addr, device)
+	d, err := s.ctrl.GetDeviceByName(device)
+	if err != nil {
+		return nil, err
+	}
+	reg, err := d.RegRead(addr)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +77,11 @@ func (s *ApiServer) regReadHex(addr uint16, device string) (*RegHex, error) {
 }
 
 func (s *ApiServer) regReadAllHex(device string) ([]*RegHex, error) {
-	regs, err := s.ctrl.RegReadAll(device)
+	d, err := s.ctrl.GetDeviceByName(device)
+	if err != nil {
+		return nil, err
+	}
+	regs, err := d.RegReadAll()
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +176,12 @@ func (s *ApiServer) handleRegWrite() http.HandlerFunc {
 			return
 		}
 
-		err = s.ctrl.RegWrite(reg, vars["device"])
+		device, err := s.ctrl.GetDeviceByName(vars["device"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		err = device.RegWrite(reg)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
@@ -180,15 +193,20 @@ func (s *ApiServer) handleMStreamAction() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		log.Debug("Handling MStream action request: device: %s action: %s", vars["device"], vars["action"])
+		device, err := s.ctrl.GetDeviceByName(vars["device"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 		switch vars["action"] {
 		case ActionStart:
-			err := s.ctrl.MStreamStart(vars["device"])
+			err = device.MStreamStart()
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadGateway)
 				return
 			}
 		case ActionStop:
-			err := s.ctrl.MStreamStop(vars["device"])
+			err := device.MStreamStop()
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadGateway)
 				return
@@ -208,16 +226,20 @@ func (s *ApiServer) handleMStreamActionAll() http.HandlerFunc {
 		log.Debug("Handling MStream action request for all devices: action: %s", vars["action"])
 		switch vars["action"] {
 		case ActionStart:
-			err := s.ctrl.MStreamStartAll()
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadGateway)
-				return
+			for _, d := range s.ctrl.GetAllDevices() {
+				err := d.MStreamStart()
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusBadGateway)
+					return
+				}
 			}
 		case ActionStop:
-			err := s.ctrl.MStreamStopAll()
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadGateway)
-				return
+			for _, d := range s.ctrl.GetAllDevices() {
+				err := d.MStreamStop()
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusBadGateway)
+					return
+				}
 			}
 		default:
 			err := srv.ErrUnknownOperation{

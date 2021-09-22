@@ -20,23 +20,27 @@ import (
 	"errors"
 	"fmt"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
+	"jinr.ru/greenlab/go-adc/pkg/srv/control/ifc"
 
 	"go.etcd.io/bbolt"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
+	pkgdevice "jinr.ru/greenlab/go-adc/pkg/device"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
 const (
-	BucketNamePrefix = "reg_"
+	RegBucketPrefix = "reg_"
 )
 
-type RegState struct {
+type State struct {
 	context.Context
 	DB *bbolt.DB
 }
 
-func NewRegState(ctx context.Context, cfg *config.Config) (*RegState, error) {
+var _ ifc.State = &State{}
+
+func NewState(ctx context.Context, cfg *config.Config) (ifc.State, error) {
 	// open register database
 	db, err := bbolt.Open(cfg.DBPath, 0600, nil)
 	if err != nil {
@@ -45,7 +49,7 @@ func NewRegState(ctx context.Context, cfg *config.Config) (*RegState, error) {
 	// create buckets in the register database for all devices
 	if err = db.Update(func(tx *bbolt.Tx) error {
 		for _, device := range cfg.Devices {
-			_, err = tx.CreateBucketIfNotExists([]byte(bucketName(device.Name)))
+			_, err = tx.CreateBucketIfNotExists([]byte(regBucketName(device.Name)))
 			if err != nil {
 				return err
 			}
@@ -54,10 +58,24 @@ func NewRegState(ctx context.Context, cfg *config.Config) (*RegState, error) {
 	}); err != nil {
 		return nil, err
 	}
-	return &RegState{
+	return &State{
 		Context: ctx,
 		DB: db,
 	}, nil
+}
+
+// CreateBucket ...
+func (s *State) CreateBucket(name string) error {
+	if err := s.DB.Update(func(tx *bbolt.Tx) error {
+		_, err := tx.CreateBucketIfNotExists([]byte(name))
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	return nil
 }
 
 func uint16ToByte(v uint16) []byte {
@@ -66,22 +84,22 @@ func uint16ToByte(v uint16) []byte {
 	return b
 }
 
-func bucketName(deviceName string) string {
-	return fmt.Sprintf("%s%s", BucketNamePrefix, deviceName)
+func regBucketName(deviceName string) string {
+	return fmt.Sprintf("%s%s", RegBucketPrefix, deviceName)
 }
 
 // Close ...
-func (s *RegState) Close() {
+func (s *State) Close() {
 	s.DB.Close()
 }
 
-// SetRegState ...
-func (s *RegState) SetReg(reg *layers.Reg, deviceName string) error {
-	log.Debug("Setting register: Addr: %x Value: %x", reg.Addr, reg.Value)
+// SetReg ...
+func (s *State) SetReg(reg *layers.Reg, deviceName string) error {
+	log.Debug("Setting register: Addr: 0x%04x Value: 0x%04x", reg.Addr, reg.Value)
 	if err := s.DB.Update(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName(deviceName)))
+		b := tx.Bucket([]byte(regBucketName(deviceName)))
 		if b == nil {
-			return errors.New(fmt.Sprintf("Bucket not found: %s", bucketName(deviceName)))
+			return errors.New(fmt.Sprintf("Bucket not found: %s", regBucketName(deviceName)))
 		}
 		if err := b.Put(uint16ToByte(reg.Addr), uint16ToByte(reg.Value)); err != nil {
 			return err
@@ -93,14 +111,14 @@ func (s *RegState) SetReg(reg *layers.Reg, deviceName string) error {
 	return nil
 }
 
-// GetRegState ...
-func (s *RegState) GetReg(addr uint16, deviceName string) (*layers.Reg, error) {
+// GetReg ...
+func (s *State) GetReg(addr uint16, deviceName string) (*layers.Reg, error) {
 	log.Debug("Getting register: Addr: %x", addr)
 	var value uint16
 	if err := s.DB.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName(deviceName)))
+		b := tx.Bucket([]byte(regBucketName(deviceName)))
 		if b == nil {
-			return errors.New(fmt.Sprintf("Bucket not found: %s", bucketName(deviceName)))
+			return errors.New(fmt.Sprintf("Bucket not found: %s", regBucketName(deviceName)))
 		}
 		valueBytes := b.Get(uint16ToByte(addr))
 		if valueBytes == nil {
@@ -117,16 +135,16 @@ func (s *RegState) GetReg(addr uint16, deviceName string) (*layers.Reg, error) {
 	}, nil
 }
 
-// GetReg ...
-func (s *RegState) GetRegAll(deviceName string) ([]*layers.Reg, error) {
+// GetRegAll ...
+func (s *State) GetRegAll(deviceName string) ([]*layers.Reg, error) {
 	log.Debug("Getting all registers")
 	var regs []*layers.Reg
 	if err := s.DB.View(func(tx *bbolt.Tx) error {
-		b := tx.Bucket([]byte(bucketName(deviceName)))
+		b := tx.Bucket([]byte(regBucketName(deviceName)))
 		if b == nil {
-			return errors.New(fmt.Sprintf("Bucket not found: %s", bucketName(deviceName)))
+			return errors.New(fmt.Sprintf("Bucket not found: %s", regBucketName(deviceName)))
 		}
-		for _, addr := range RegMap {
+		for _, addr := range pkgdevice.RegMap {
 			valueBytes := b.Get(uint16ToByte(addr))
 			if valueBytes == nil {
 				return errors.New(fmt.Sprintf("Key not found: %d", addr))

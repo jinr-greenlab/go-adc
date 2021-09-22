@@ -77,7 +77,7 @@ func (c *ApiClient) RegReadAll(device string) (map[string]string, error) {
 	}
 	var regs []*control.RegHex
 	result := make(map[string]string)
-	err = r.ToJSON(regs)
+	err = r.ToJSON(&regs)
 	if err != nil {
 		return nil, err
 	}

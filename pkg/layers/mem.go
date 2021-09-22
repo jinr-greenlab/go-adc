@@ -18,6 +18,7 @@ import (
 	"encoding/binary"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"hash/crc32"
 )
 
 const (
@@ -27,8 +28,8 @@ const (
 
 type MemOp struct {
 	Read bool
-	Addr uint32
-	Size uint32
+	Addr uint32 // 22 bits
+	Size uint32 // 9 bits
 	Data []uint32 // if Read is true, Value is ignored
 }
 
@@ -40,7 +41,7 @@ type MemLayer struct {
 var MemLayerType = gopacket.RegisterLayerType(MemLayerNum,
 	gopacket.LayerTypeMetadata{Name: "MemLayerType", Decoder: gopacket.DecodeFunc(DecodeMemLayer)})
 
-// LayerType returns the type of the MStream layer in the layer catalog
+// LayerType returns the type of the Mem layer in the layer catalog
 func (reg *MemLayer) LayerType() gopacket.LayerType {
 	return MemLayerType
 }
@@ -51,9 +52,9 @@ func (reg *MemLayer) LayerType() gopacket.LayerType {
 // it to MLinkLayer.SerializeTo method.
 func (mem *MemLayer) Serialize(buf []byte) {
 	if mem.MemOp.Read {
-		binary.LittleEndian.PutUint32(buf[0:4], 0x80000000|((uint32(mem.Size)&0x1ff)<<22)|(uint32(mem.Addr)&0x3fffff))
+		binary.LittleEndian.PutUint32(buf[0:4], 0x80000000 | ((mem.Size & 0x1ff) << 22) | (mem.Addr & 0x3fffff))
 	} else {
-		binary.LittleEndian.PutUint32(buf[0:4], 0x00000000|((uint32(mem.Size)&0x1ff)<<22)|(uint32(mem.Addr)&0x3fffff))
+		binary.LittleEndian.PutUint32(buf[0:4], 0x00000000 | ((mem.Size & 0x1ff) << 22) | (mem.Addr & 0x3fffff))
 		for i, word := range(mem.Data)  {
 			offset := (i + 1) * 4
 			binary.LittleEndian.PutUint32(buf[offset:offset+4], word)
@@ -98,4 +99,35 @@ func DecodeMemLayer(data []byte, p gopacket.PacketBuilder) error {
 	}
 	p.AddLayer(req)
 	return nil
+}
+
+// MemOpToBytes ...
+func MemOpToBytes(op *MemOp, seq uint16) ([]byte, error) {
+	ml := &MLinkLayer{}
+	ml.Type = MLinkTypeMemRequest
+	ml.Sync = MLinkSync
+	// 3 words for MLink header + 1 word CRC + 1 word MemOp header + N words MemOp data
+	ml.Len = uint16(4 + op.Size + 1)
+	ml.Seq = seq
+	ml.Src = MLinkHostAddr
+	ml.Dst = MLinkDeviceAddr
+
+	// Calculate crc32 checksum
+	mlHeaderBytes := make([]byte, 12)
+	ml.SerializeHeader(mlHeaderBytes)
+
+	mem := &MemLayer{}
+	mem.MemOp = op
+	memBytes := make([]byte, (1 + op.Size) * 4) // one word for Mem request header and Size words for data
+	mem.Serialize(memBytes)
+
+	ml.Crc = crc32.ChecksumIEEE(append(mlHeaderBytes, memBytes...))
+
+	buf := gopacket.NewSerializeBuffer()
+	opts := gopacket.SerializeOptions{}
+	err := gopacket.SerializeLayers(buf, opts, ml, mem)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }

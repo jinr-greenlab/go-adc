@@ -14,15 +14,22 @@
 
 package ifc
 
-import "jinr.ru/greenlab/go-adc/pkg/layers"
+import (
+	deviceifc "jinr.ru/greenlab/go-adc/pkg/device/ifc"
+	"jinr.ru/greenlab/go-adc/pkg/layers"
+	"net"
+)
 
 type ControlServer interface {
-	RegRead(addr uint16, device string) (*layers.Reg, error)
-	RegReadAll(device string) ([]*layers.Reg, error)
-	RegWrite(reg *layers.Reg, device string) error
-	MStreamStart(device string) error
-	MStreamStop(device string) error
-	MStreamStartAll() error
-	MStreamStopAll() error
 	Run() error
+
+	// deviceName is used to get device IP from config
+	RegRequestByDeviceName(ops []*layers.RegOp, deviceName string) error
+	RegRequest(ops []*layers.RegOp, IP *net.IP) error
+	// deviceName is used to get device IP from config
+	MemRequestByDeviceName(op *layers.MemOp, deviceName string) error
+	MemRequest(op *layers.MemOp, IP *net.IP) error
+
+	GetDeviceByName(deviceName string) (deviceifc.Device, error)
+	GetAllDevices() map[string]deviceifc.Device
 }
