@@ -105,11 +105,11 @@ func (c *ApiClient) RegWrite(device, addr, value string) error {
 
 // MStreamStart sends request to start streaming for a device
 func (c *ApiClient) MStreamStart(device string) error {
-	r, err := req.Get(c.mstreamUrl("start", device))
+	r, err := req.Get(fmt.Sprintf("%s/mstream/start/%s", c.ApiPrefix, device))
 	if err != nil {
 		return err
 	}
-	if ! (r.Response().StatusCode != 200) {
+	if r.Response().StatusCode != 200 {
 		return errors.New(r.Response().Status)
 	}
 	return nil
@@ -117,11 +117,11 @@ func (c *ApiClient) MStreamStart(device string) error {
 
 // MStreamStop sends request to stop streaming for a device
 func (c *ApiClient) MStreamStop(device string) error {
-	r, err := req.Get(c.mstreamUrl("stop", device))
+	r, err := req.Get(fmt.Sprintf("%s/mstream/stop/%s", c.ApiPrefix, device))
 	if err != nil {
 		return err
 	}
-	if ! (r.Response().StatusCode != 200) {
+	if r.Response().StatusCode != 200 {
 		return errors.New(r.Response().Status)
 	}
 	return nil
@@ -129,11 +129,11 @@ func (c *ApiClient) MStreamStop(device string) error {
 
 // MStreamStartAll sends request to start streaming for all devices
 func (c *ApiClient) MStreamStartAll() error {
-	r, err := req.Get(c.mstreamUrl("start", ""))
+	r, err := req.Get(fmt.Sprintf("%s/mstream/start", c.ApiPrefix))
 	if err != nil {
 		return err
 	}
-	if ! (r.Response().StatusCode != 200) {
+	if r.Response().StatusCode != 200 {
 		return errors.New(r.Response().Status)
 	}
 	return nil
@@ -141,11 +141,11 @@ func (c *ApiClient) MStreamStartAll() error {
 
 // MStreamStop sends request to stop streaming for all devices
 func (c *ApiClient) MStreamStopAll() error {
-	r, err := req.Get(c.mstreamUrl("stop", ""))
+	r, err := req.Get(fmt.Sprintf("%s/mstream/stop", c.ApiPrefix))
 	if err != nil {
 		return err
 	}
-	if ! (r.Response().StatusCode != 200) {
+	if r.Response().StatusCode != 200 {
 		return errors.New(r.Response().Status)
 	}
 	return nil

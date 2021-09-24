@@ -34,7 +34,7 @@ import (
 
 const (
 	RegPort = 33300
-	RegReadInterval = 10
+	RegReadInterval = 30
 )
 
 type ControlServer struct {
@@ -191,7 +191,6 @@ func (s *ControlServer) Run() error {
 	// Periodically read all registers from all devices
 	go func() {
 		for {
-			time.Sleep(RegReadInterval * time.Second)
 			var ops []*layers.RegOp
 			for i := pkgdevice.RegAlias(0); i < pkgdevice.RegAliasLimit; i++ {
 				addr := pkgdevice.RegMap[i]
@@ -203,6 +202,7 @@ func (s *ControlServer) Run() error {
 					log.Error("Error while sending reg request to device %s", device.IP)
 				}
 			}
+			time.Sleep(RegReadInterval * time.Second)
 		}
 	}()
 

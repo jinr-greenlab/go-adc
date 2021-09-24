@@ -20,7 +20,6 @@ import (
 	"github.com/spf13/cobra"
 	"jinr.ru/greenlab/go-adc/pkg/command"
 	"jinr.ru/greenlab/go-adc/pkg/config"
-	"jinr.ru/greenlab/go-adc/pkg/srv/control"
 )
 
 func NewMStreamCommand() *cobra.Command {
@@ -28,26 +27,25 @@ func NewMStreamCommand() *cobra.Command {
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:    "mstream",
+		Use:    fmt.Sprintf("mstream start|stop"),
 		Short:  "Start/stop streaming for a device",
 		Args:   cobra.ExactArgs(1),
-		ValidArgs: []string{control.ActionStart, control.ActionStop},
+		ValidArgs: []string{"start", "stop"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			apiClient := command.NewApiClient(cfg)
 			switch args[0] {
-			case control.ActionStart:
+			case "start":
 				if device != "" {
 					return apiClient.MStreamStart(device)
 				}
 				return apiClient.MStreamStartAll()
-			case control.ActionStop:
+			case "stop":
 				if device != "" {
 					return apiClient.MStreamStop(device)
 				}
 				return apiClient.MStreamStopAll()
 			default:
-				return errors.New(
-					fmt.Sprintf("Wrong streaming command. Must be one of %s/%s", control.ActionStart, control.ActionStop))
+				return errors.New("Wrong streaming command. Must be one of start/stop")
 			}
 		},
 	}

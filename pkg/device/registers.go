@@ -98,6 +98,7 @@ const (
 	RegTrigCsrBase uint16 = 0x240
 )
 
+// even more register addresses in mregdevice.h qtmregdevice.cpp
 var RegMap = map[RegAlias]uint16{
 	RegDeviceCtrl: 0x40,
 	RegDeviceRlat: 0x41,

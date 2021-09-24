@@ -30,8 +30,6 @@ import (
 
 const (
 	ApiPort = 8000
-	ActionStart = "start"
-	ActionStop = "stop"
 )
 
 // RegHex ...
@@ -108,11 +106,10 @@ func (s *ApiServer) configureRouter() {
 	s.Router = mux.NewRouter()
 	subRouter := s.Router.PathPrefix("/api").Subrouter()
 	subRouter.HandleFunc("/reg/r/{device}/{addr:0x[0-9abcdef]{4}}", s.handleRegRead()).Methods("GET")
-	subRouter.HandleFunc("/reg/r/{device}/all", s.handleRegReadAll()).Methods("GET")
+	subRouter.HandleFunc("/reg/r/{device}", s.handleRegReadAll()).Methods("GET")
 	subRouter.HandleFunc("/reg/w/{device}", s.handleRegWrite()).Methods("POST")
-	mstreamActionUrl := fmt.Sprintf("/mstream/{action:%s|%s}", ActionStart, ActionStop)
-	subRouter.HandleFunc(fmt.Sprintf("%s/{device}", mstreamActionUrl), s.handleMStreamAction()).Methods("GET")
-	subRouter.HandleFunc(fmt.Sprintf("%s/all", mstreamActionUrl), s.handleMStreamActionAll()).Methods("GET")
+	subRouter.HandleFunc("/mstream/{action:start|stop}/{device}", s.handleMStreamAction()).Methods("GET")
+	subRouter.HandleFunc("/mstream/{action:start|stop}", s.handleMStreamActionAll()).Methods("GET")
 }
 
 func (s *ApiServer) handleRegRead() http.HandlerFunc {
@@ -199,13 +196,13 @@ func (s *ApiServer) handleMStreamAction() http.HandlerFunc {
 			return
 		}
 		switch vars["action"] {
-		case ActionStart:
+		case "start":
 			err = device.MStreamStart()
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadGateway)
 				return
 			}
-		case ActionStop:
+		case "stop":
 			err := device.MStreamStop()
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadGateway)
@@ -213,7 +210,7 @@ func (s *ApiServer) handleMStreamAction() http.HandlerFunc {
 			}
 		default:
 			err := srv.ErrUnknownOperation{
-				What: fmt.Sprintf("Wrong MStream action. Must be one of %s/%s", ActionStart, ActionStop),
+				What: "Wrong MStream action. Must be one of start/stop",
 			}
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
@@ -225,7 +222,7 @@ func (s *ApiServer) handleMStreamActionAll() http.HandlerFunc {
 		vars := mux.Vars(r)
 		log.Debug("Handling MStream action request for all devices: action: %s", vars["action"])
 		switch vars["action"] {
-		case ActionStart:
+		case "start":
 			for _, d := range s.ctrl.GetAllDevices() {
 				err := d.MStreamStart()
 				if err != nil {
@@ -233,7 +230,7 @@ func (s *ApiServer) handleMStreamActionAll() http.HandlerFunc {
 					return
 				}
 			}
-		case ActionStop:
+		case "stop":
 			for _, d := range s.ctrl.GetAllDevices() {
 				err := d.MStreamStop()
 				if err != nil {
@@ -243,7 +240,7 @@ func (s *ApiServer) handleMStreamActionAll() http.HandlerFunc {
 			}
 		default:
 			err := srv.ErrUnknownOperation{
-				What: fmt.Sprintf("Wrong MStream action. Must be one of %s/%s", ActionStart, ActionStop),
+				What: "Wrong MStream action. Must be one of start/stop",
 			}
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}

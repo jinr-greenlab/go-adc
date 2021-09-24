@@ -179,18 +179,9 @@ func (d *Device) UpdateReg(reg *layers.Reg) error {
 func (d *Device) MStreamStart() error {
 	var ops []*layers.RegOp
 	ops = []*layers.RegOp{
-		{
-			Reg: &layers.Reg{
-				Addr:  RegMap[RegDeviceCtrl],
-				Value: 0,
-			},
-		},
-		{
-			Reg: &layers.Reg{
-				Addr:  RegMap[RegDeviceCtrl],
-				Value: 0x8000,
-			},
-		},
+		{Reg: &layers.Reg{Addr: RegMap[RegDeviceCtrl], Value: 0}},
+		{Reg: &layers.Reg{Addr: RegMap[RegDeviceCtrl],	Value: 0x8000}},
+		{Reg: &layers.Reg{Addr: RegMap[RegMstreamRunCtrl],	Value: 1}},
 	}
 	return d.ctrl.RegRequest(ops, d.IP)
 }
@@ -198,18 +189,9 @@ func (d *Device) MStreamStart() error {
 // MStreamStop ...
 func (d *Device) MStreamStop() error {
 	ops := []*layers.RegOp{
-		{
-			Reg: &layers.Reg{
-				Addr:  RegMap[RegDeviceCtrl],
-				Value: 1,
-			},
-		},
-		{
-			Reg: &layers.Reg{
-				Addr: RegMap[RegDeviceCtrl],
-				Value: 0,
-			},
-		},
+		{Reg: &layers.Reg{Addr: RegMap[RegDeviceCtrl], Value: 1}},
+		{Reg: &layers.Reg{Addr: RegMap[RegDeviceCtrl], Value: 0}},
+		{Reg: &layers.Reg{Addr: RegMap[RegMstreamRunCtrl], Value: 0}},
 	}
 	return d.ctrl.RegRequest(ops, d.IP)
 }
