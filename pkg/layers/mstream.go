@@ -28,10 +28,12 @@ const (
 )
 
 type MStreamHeader struct {
-	DeviceID       uint8 // it is always 0xd9 which corresponds to adc64ve-xge
-	Flags          uint8
-	Subtype        uint8
-	FragmentLength uint16 // length of fragment payload NOT including MStream header
+	FragmentLength uint16 // length of fragment payload NOT including MStream header in bytes
+	Subtype        uint8 // 2 bits
+	Flags          uint8 // 6 bits
+	// 0xd9 for ADC64VE-XGE
+	// 0xdf for ADC64VE-V3-XG
+	DeviceID       uint8
 	FragmentID     uint16
 	FragmentOffset uint16
 }
@@ -59,22 +61,19 @@ func (ms *MStreamLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Se
 	binary.LittleEndian.PutUint16(headerBytes[0:2], ms.FragmentLength)
 
 	headerBytes[2] = (ms.Flags << 2) | ms.Subtype
+
 	headerBytes[3] = ms.DeviceID
-	binary.LittleEndian.PutUint16(headerBytes[4:6], ms.FragmentID)
-	binary.LittleEndian.PutUint16(headerBytes[6:8], ms.FragmentOffset)
+
+	binary.LittleEndian.PutUint32(headerBytes[4:8], (uint32(ms.FragmentID) << 16) | uint32(ms.FragmentOffset))
+
 	return nil
 }
 
 func (ms *MStreamLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
-	if len(data) < 16 {
+	if len(data) < 8 {
 		df.SetTruncated()
 		// TODO return custom error
 		return errors.New("MStream packet too short")
-	}
-
-	ms.BaseLayer = layers.BaseLayer{
-		Contents: data[0:16], // MStream header 16 bytes
-		Payload: data[16:], // data without MStream header
 	}
 
 	ms.FragmentLength = binary.LittleEndian.Uint16(data[0:2])
@@ -82,11 +81,19 @@ func (ms *MStreamLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback)
 		return errors.New("Invalid MStream header: FragmentLength = 0")
 	}
 
-	ms.Subtype = data[2] & 0b00000011 // Subtype is two least significant bits
-	ms.Flags = (data[2] >> 2) & 0b00111111 // Flags is six high bits
+	ms.BaseLayer = layers.BaseLayer{
+		Contents: data[0:8], // MStream header 8 bytes
+		Payload: data[8:ms.FragmentLength + 8], // data without MStream header
+	}
+
+	ms.Subtype = data[2] & 0x3 // Subtype is two least significant bits
+	ms.Flags = (data[2] >> 2) & 0x3f // Flags is six high bits
+
 	ms.DeviceID = data[3]
-	ms.FragmentID = binary.LittleEndian.Uint16(data[4:6]) // FragmentID takes 2 bytes for MStream 2.x
-	ms.FragmentOffset = binary.LittleEndian.Uint16(data[6:8]) // FragmentOffset takes 2 bytes for MStream 2.x
+	fragmentOffsetID := binary.LittleEndian.Uint32(data[4:8])
+
+	ms.FragmentID = uint16(fragmentOffsetID >> 16) // FragmentID takes 2 bytes for MStream 2.x
+	ms.FragmentOffset = uint16(fragmentOffsetID & 0xffff) // FragmentOffset takes 2 bytes for MStream 2.x
 
 	return nil
 }
@@ -116,7 +123,7 @@ func (ms *MStreamLayer) SetAck(ack bool) {
 }
 
 func DecodeMStreamLayer(data []byte, p gopacket.PacketBuilder) error {
-	ms := &MStreamLayer{}
+	ms := &MStreamLayer{MStreamHeader: MStreamHeader{}}
 	err := ms.DecodeFromBytes(data, p)
 	if err != nil {
 		return err

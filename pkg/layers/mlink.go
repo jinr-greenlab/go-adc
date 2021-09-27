@@ -173,13 +173,6 @@ func (ml *MLinkLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) e
 		return errors.New(fmt.Sprintf("Wrong MLink sync. Must be %d", MLinkSync))
 	}
 
-	// TODO Discuss with AFI and unificate CRC to be crc32 sum
-	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	// This check is only valid for MStream
-	//if binary.LittleEndian.Uint32(data[len(data)-4:]) != MLinkMStreamCRC {
-	//	return errors.New(fmt.Sprintf("Wrong MLink tail for MStream frame. Must be %d", MLinkMStreamCRC))
-	//}
-
 	ml.BaseLayer = layers.BaseLayer{
 		Contents: data[0:12], // MLink header 12 bytes
 		Payload: data[12:len(data)-4], // data without MLink header and without CRC in the end of each MLink frame
@@ -191,6 +184,14 @@ func (ml *MLinkLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) e
 	ml.Len = binary.LittleEndian.Uint16(data[6:8])
 	ml.Src = binary.LittleEndian.Uint16(data[8:10])
 	ml.Dst = binary.LittleEndian.Uint16(data[10:12])
+	ml.Crc = binary.LittleEndian.Uint32(data[len(data)-4:])
+
+	// TODO Discuss with AFI and unificate CRC to be crc32 sum
+	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	// This check is only valid for MStream
+	if ml.Type == MLinkTypeMStream && ml.Crc != MLinkMStreamCRC {
+		return errors.New(fmt.Sprintf("Wrong MLink tail for MStream frame. Must be 0x%08x", MLinkMStreamCRC))
+	}
 
 	return nil
 }

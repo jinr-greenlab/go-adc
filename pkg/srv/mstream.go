@@ -16,8 +16,10 @@ package srv
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/google/gopacket"
@@ -68,42 +70,9 @@ func (s *MStreamServer) Run() error {
 	errChan := make(chan error, 1)
 	buffer := make([]byte, 65536)
 
-
-	// read packets from the chCaptured packet channel and handle them
-	go func() {
-		source := gopacket.NewPacketSource(s, layers.MLinkLayerType)
-		defragmenter := layers.NewMStreamDefragmenter()
-		for packet := range source.Packets() {
-			log.Debug("MStream frame received")
-			ms := packet.Layer(layers.MStreamLayerType)
-			if ms != nil {
-				log.Debug("MStream frame successfully parsed")
-				ms := ms.(*layers.MStreamLayer)
-				// empty flow is ok until we work with the only device
-				// once we have many devices we have to use non empty flow
-				flow := &gopacket.Flow{}
-				out, handleErr := defragmenter.Defrag(ms, flow)
-				if handleErr != nil {
-					log.Error("Error while trying to defragment MStream frame")
-					continue
-				} else if out == nil {
-					// this was MStream fragment, we don't have full frame yet, do nothing
-					continue
-				}
-				log.Debug("Successfully decoded and defragmented MStream frame")
-				udpaddr, handleErr := GetAddrPort(packet)
-				if handleErr != nil {
-					continue
-				}
-				s.SendAck(ms.FragmentID, ms.FragmentOffset, udpaddr)
-			}
-		}
-	}()
-
-	// receive data from the wire and put them to the chCaptured packet channel
+	// Read packets from wire and put them to input queue
 	go func() {
 		for {
-			// TODO Use ReadFromUDP
 			length, addr, readErr := conn.ReadFrom(buffer)
 			if readErr != nil {
 				errChan <- readErr
@@ -114,21 +83,64 @@ func (s *MStreamServer) Run() error {
 				errChan <- readErr
 				return
 			}
+			log.Debug("Received packet from %s", udpAddr)
+			ipAddr := net.ParseIP(strings.Split(addr.String(), ":")[0])
+			device, err := s.GetDeviceByIP(ipAddr)
+			if err != nil {
+				log.Debug("Drop packet. Device not found for given IP: %s ", ipAddr.String())
+				continue
+			}
+
 			captureInfo := gopacket.CaptureInfo{
 				Length: length,
 				CaptureLength: length,
 				Timestamp: time.Now(),
-				AncillaryData: []interface{}{udpAddr},
+				AncillaryData: []interface{}{udpAddr, device.Name},
 			}
 
 			s.ChIn <- InPacket{Data: buffer[:length], CaptureInfo: captureInfo}
 		}
 	}()
 
-	// read data from the chSend channel and send them to the wire
+	// Read packets from input queue and handle them properly
+	go func() {
+		source := gopacket.NewPacketSource(s, layers.MLinkLayerType)
+		//defragmenter := layers.NewMStreamDefragmenter()
+		for packet := range source.Packets() {
+			log.Debug("MStream frame received")
+			log.Debug(packet.Dump())
+			layer := packet.Layer(layers.MStreamLayerType)
+			if layer != nil {
+				log.Debug("MStream frame successfully parsed")
+				layer := layer.(*layers.MStreamLayer)
+				// empty flow is ok until we work with the only device
+				// once we have many devices we have to use non empty flow
+				//flow := &gopacket.Flow{}
+				//out, handleErr := defragmenter.Defrag(layer, flow)
+				//if handleErr != nil {
+				//	log.Error("Error while trying to defragment MStream frame")
+				//	continue
+				//} else if out == nil {
+				//	// this was MStream fragment, we don't have full frame yet, do nothing
+				//	continue
+				//}
+				//log.Debug("Successfully decoded and defragmented MStream frame")
+				udpaddr, handleErr := GetAddrPort(packet)
+				if handleErr != nil {
+					log.Error("Error while getting udpaddr for a packet from input queue")
+					continue
+				}
+				log.Debug("FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t", layer.FragmentID, layer.FragmentOffset, layer.LastFragment())
+				s.SendAck(layer.FragmentID, layer.FragmentOffset, udpaddr)
+			}
+		}
+	}()
+
+	// Read packets from output queue and send them to wire
 	go func() {
 		for {
 			outPacket := <-s.ChOut
+			log.Debug("Sending packet to %s", outPacket.UDPAddr)
 			_, sendErr := conn.WriteToUDP(outPacket.Data, outPacket.UDPAddr)
 			if sendErr != nil {
 				log.Error("Error while sending data to %s", outPacket.UDPAddr)
@@ -179,6 +191,8 @@ func (s *MStreamServer) SendAck(fragmentID, fragmentOffset uint16, udpAddr *net.
 		log.Error("Error while serializing layers when sending MStream ack message to device %s", udpAddr)
 		return err
 	}
+
+	log.Debug("Put MStream Ack to output queue: udpaddr: %s ack: %s", udpAddr, hex.EncodeToString(buf.Bytes()))
 
 	s.ChOut <- OutPacket{
 		Data: buf.Bytes(),
