@@ -130,8 +130,10 @@ func (s *MStreamServer) Run() error {
 					log.Error("Error while getting udpaddr for a packet from input queue")
 					continue
 				}
-				log.Debug("FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t", layer.FragmentID, layer.FragmentOffset, layer.LastFragment())
-				s.SendAck(layer.FragmentID, layer.FragmentOffset, udpaddr)
+				for _, fragment := range layer.Fragments {
+					log.Debug("FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t", fragment.FragmentID, fragment.FragmentOffset, fragment.LastFragment())
+					s.SendAck(fragment.FragmentID, fragment.FragmentOffset, udpaddr)
+				}
 			}
 		}
 	}()
@@ -176,13 +178,18 @@ func (s *MStreamServer) SendAck(fragmentID, fragmentOffset uint16, udpAddr *net.
 	ml.Dst = layers.MLinkHostAddr
 	ml.Crc = 0
 
-	ms := &layers.MStreamLayer{}
-	ms.DeviceID = 1
-	ms.Subtype = 0
-	ms.Flags = 0b00010000
-	ms.FragmentLength = 0
-	ms.FragmentID = fragmentID
-	ms.FragmentOffset = fragmentOffset
+	ms := &layers.MStreamLayer{
+		Fragments: []layers.MStreamFragment{
+			{
+				DeviceID:       1,
+				Subtype:        0,
+				Flags:          0b00010000,
+				FragmentLength: 0,
+				FragmentID:     fragmentID,
+				FragmentOffset: fragmentOffset,
+			},
+		},
+	}
 
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{}

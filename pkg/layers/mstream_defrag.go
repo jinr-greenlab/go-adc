@@ -136,7 +136,7 @@ type fragmentListKey struct {
 	FragmentID uint16
 }
 
-func newFragmentListKey(ms *MStreamLayer, flow *gopacket.Flow) fragmentListKey {
+func newFragmentListKey(ms *MStreamFragment, flow *gopacket.Flow) fragmentListKey {
 	return fragmentListKey{
 		Flow: flow,
 		FragmentID: ms.FragmentID,
