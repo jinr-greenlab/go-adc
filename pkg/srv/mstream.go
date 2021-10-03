@@ -64,7 +64,6 @@ func (s *MStreamServer) Run() error {
 	if err != nil {
 		return err
 	}
-
 	defer conn.Close()
 
 	errChan := make(chan error, 1)
@@ -105,7 +104,7 @@ func (s *MStreamServer) Run() error {
 	// Read packets from input queue and handle them properly
 	go func() {
 		source := gopacket.NewPacketSource(s, layers.MLinkLayerType)
-		//defragmenter := layers.NewMStreamDefragmenter()
+		defragmenter := layers.NewMStreamDefragmenter()
 		for packet := range source.Packets() {
 			log.Debug("MStream frame received")
 			log.Debug(packet.Dump())
@@ -113,26 +112,42 @@ func (s *MStreamServer) Run() error {
 			if layer != nil {
 				log.Debug("MStream frame successfully parsed")
 				layer := layer.(*layers.MStreamLayer)
-				// empty flow is ok until we work with the only device
-				// once we have many devices we have to use non empty flow
-				//flow := &gopacket.Flow{}
-				//out, handleErr := defragmenter.Defrag(layer, flow)
-				//if handleErr != nil {
-				//	log.Error("Error while trying to defragment MStream frame")
-				//	continue
-				//} else if out == nil {
-				//	// this was MStream fragment, we don't have full frame yet, do nothing
-				//	continue
-				//}
-				//log.Debug("Successfully decoded and defragmented MStream frame")
+
+				deviceName, handleErr := GetDeviceName(packet);
+				if handleErr != nil {
+					log.Error("Error while trying to get device name from packet")
+					continue
+				}
+
 				udpaddr, handleErr := GetAddrPort(packet)
 				if handleErr != nil {
 					log.Error("Error while getting udpaddr for a packet from input queue")
 					continue
 				}
-				for _, fragment := range layer.Fragments {
-					log.Debug("FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t", fragment.FragmentID, fragment.FragmentOffset, fragment.LastFragment())
-					s.SendAck(fragment.FragmentID, fragment.FragmentOffset, udpaddr)
+
+				for _, f := range layer.Fragments {
+					log.Debug("Handling fragment: FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t",
+						f.FragmentID, f.FragmentOffset, f.LastFragment())
+
+					s.SendAck(f.FragmentID, f.FragmentOffset, udpaddr)
+
+					if f.Subtype == layers.MStreamTriggerSubtype && !f.LastFragment() {
+						log.Error("!!! Something really bad is happening. Trigger data is fragmented.")
+						continue
+					}
+
+					assembled, handleErr := defragmenter.Defrag(f, deviceName)
+					if handleErr != nil {
+						log.Error("Error while trying to handle MStream fragment")
+						continue
+					} else if assembled == nil {
+						log.Debug("This was MStream fragment, we don't have full frame yet, do nothing")
+						continue
+					}
+
+					// Here assembled must be not nil
+					log.Debug("!!! Frame assembled: ID: %d Offset: %d Length: %d",
+						f.FragmentID, f.FragmentOffset, f.FragmentLength)
 				}
 			}
 		}
@@ -179,7 +194,7 @@ func (s *MStreamServer) SendAck(fragmentID, fragmentOffset uint16, udpAddr *net.
 	ml.Crc = 0
 
 	ms := &layers.MStreamLayer{
-		Fragments: []layers.MStreamFragment{
+		Fragments: []*layers.MStreamFragment{
 			{
 				DeviceID:       1,
 				Subtype:        0,
@@ -187,6 +202,7 @@ func (s *MStreamServer) SendAck(fragmentID, fragmentOffset uint16, udpAddr *net.
 				FragmentLength: 0,
 				FragmentID:     fragmentID,
 				FragmentOffset: fragmentOffset,
+				Data:           []byte{},
 			},
 		},
 	}

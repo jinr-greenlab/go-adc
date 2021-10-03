@@ -16,8 +16,6 @@ package layers
 
 import (
 	"container/list"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 	"sync"
 )
@@ -43,88 +41,84 @@ type fragmentList struct {
 }
 
 // insert inserts MStream fragment into the fragment list
-func (fl *fragmentList) insert(ms *MStreamLayer) (*MStreamLayer, error) {
+func (fl *fragmentList) insert(f *MStreamFragment) (*MStreamFragment, error) {
 
-	if ms.FragmentOffset >= fl.Highest {
-		fl.List.PushBack(ms)
+	if f.FragmentOffset >= fl.Highest {
+		fl.List.PushBack(f)
 	} else {
 		for e := fl.List.Front(); e != nil; e = e.Next() {
 			// we don't check the error here the list contains only MStream fragments
-			frag, _ := e.Value.(*MStreamLayer)
+			frag, _ := e.Value.(*MStreamFragment)
 
-			if ms.FragmentOffset == frag.FragmentOffset {
+			if f.FragmentOffset == frag.FragmentOffset {
 				log.Debug("defrag: insert: ignoring fragment %d as we already have it (duplicate?)",
-					ms.FragmentOffset)
+					f.FragmentOffset)
 				return nil, nil
 			}
 
-			if ms.FragmentOffset < frag.FragmentOffset {
+			if f.FragmentOffset < frag.FragmentOffset {
 				log.Debug("defrag: insert: inserting fragment %d before existing fragment %d",
-					ms.FragmentOffset, frag.FragmentOffset)
-				fl.List.InsertBefore(ms, e)
+					f.FragmentOffset, frag.FragmentOffset)
+				fl.List.InsertBefore(f, e)
 				break
 			}
 		}
 	}
 
 	// After inserting the fragment, we update the fragment list state
-	if fl.Highest < ms.FragmentOffset + ms.FragmentLength {
-		fl.Highest = ms.FragmentOffset + ms.FragmentLength
+	if fl.Highest < f.FragmentOffset + f.FragmentLength {
+		fl.Highest = f.FragmentOffset + f.FragmentLength
 	}
-	fl.TotalLength += ms.FragmentLength
+	fl.TotalLength += f.FragmentLength
 
-	log.Debug("defrag: insert: fragment list state: fragments count: %d highest length: %d total length: %d",
+	log.Debug("defrag: insert: fragment list state: fragments count: %d highest: %d total: %d",
 		fl.List.Len(), fl.Highest, fl.TotalLength)
 
-	if ms.LastFragment() {
+	if f.LastFragment() {
 		fl.LastFragmentReceived = true
 	}
 
 	// Last fragment received and the total length of all fragments corresponds
 	// to the end of the last fragment which means there are no missing fragments.
 	if fl.LastFragmentReceived && fl.Highest == fl.TotalLength {
-		return fl.assemble(ms)
+		return fl.assemble(f)
 	}
 	return nil, nil
 }
 
-// assemble builds MStream frame from its fragments placed in fragment list
-func (fl *fragmentList) assemble(ms *MStreamLayer) (*MStreamLayer, error) {
-	var result []byte
+// assemble builds MStream layer from its fragments placed in fragment list
+func (fl *fragmentList) assemble(f *MStreamFragment) (*MStreamFragment, error) {
+	var data []byte
 	var currentOffset uint16
 
 	log.Debug("defrag: assemble: assembling the MStream frame from fragments")
 
 	for e := fl.List.Front(); e != nil; e = e.Next() {
 		// we don't check the error here since the list contains only MStream fragments
-		frag, _ := e.Value.(*MStreamLayer)
+		frag, _ := e.Value.(*MStreamFragment)
 		if frag.FragmentOffset == currentOffset { // First fragment must have offset = 0
 			log.Debug("defrag: assemble: add fragment id: %d offset: %d", frag.FragmentID, frag.FragmentOffset)
-			result = append(result, frag.Payload...)
+			data = append(data, frag.Data...)
 			currentOffset += frag.FragmentLength
 		} else {
 			// Houston, we have a problem.
 			return nil, ErrMStreamAssemble{ What: "overlapping fragment or hole found while assembling" }
 		}
-		log.Debug("defrag: assemble: next id: %d offset: %d", ms.FragmentID, currentOffset)
+		log.Debug("defrag: assemble: next id: %d offset: %d", f.FragmentID, currentOffset)
 	}
 
-	out := &MStreamLayer{
-		MStreamHeader: MStreamHeader{
-			DeviceID: ms.DeviceID,
-			Flags:    ms.Flags,
-			Subtype:  ms.Subtype,
-			FragmentLength: fl.Highest,
-			FragmentID: ms.FragmentID,
-			FragmentOffset: 0,
-		},
-		BaseLayer: layers.BaseLayer{
-			Payload: result,
-		},
+	assembled := &MStreamFragment{
+		DeviceID: f.DeviceID,
+		Flags:    f.Flags,
+		Subtype:  f.Subtype,
+		FragmentLength: fl.Highest,
+		FragmentID: f.FragmentID,
+		FragmentOffset: 0,
+		Data: data,
 	}
-	out.SetLastFragment(true)
+	assembled.SetLastFragment(true)
 
-	return out, nil
+	return assembled, nil
 }
 
 // fragmentListKey is used as a map key. It fully identifies the fragmented
@@ -132,14 +126,14 @@ func (fl *fragmentList) assemble(ms *MStreamLayer) (*MStreamLayer, error) {
 // plus FragmentID which is the same for all fragments within a MStream frame
 // and different for different MStream frames.
 type fragmentListKey struct {
-	*gopacket.Flow
+	Device string
 	FragmentID uint16
 }
 
-func newFragmentListKey(ms *MStreamFragment, flow *gopacket.Flow) fragmentListKey {
+func NewFragmentListKey(f *MStreamFragment, device string) fragmentListKey {
 	return fragmentListKey{
-		Flow: flow,
-		FragmentID: ms.FragmentID,
+		Device: device,
+		FragmentID: f.FragmentID,
 	}
 }
 
@@ -152,33 +146,37 @@ type MStreamDefragmenter struct {
 	fragments map[fragmentListKey]*fragmentList
 }
 
-func (md *MStreamDefragmenter) Defrag(ms *MStreamLayer, flow *gopacket.Flow) (*MStreamLayer, error) {
-	log.Debug("defrag: got a new fragment FragmentID: %d FragmentOffset: %d LastFragment: %t",
-		ms.FragmentID, ms.FragmentOffset, ms.LastFragment())
+// Defrag ...
+func (md *MStreamDefragmenter) Defrag(f *MStreamFragment, device string) (*MStreamFragment, error) {
+	log.Debug("defrag: FragmentID: %d FragmentOffset: %d FragmentLength: %d LastFragment: %t",
+		f.FragmentID, f.FragmentOffset, f.FragmentLength, f.LastFragment())
 
-	key := newFragmentListKey(ms, flow)
+	key := NewFragmentListKey(f, device)
+
 	var fl *fragmentList
 	md.Lock()
 	fl, ok := md.fragments[key]
 	if !ok {
-		log.Debug("defrag: unknown flow, creating a new one")
+		log.Debug("defrag: unknown fragment list key, creating a new one")
 		fl = new(fragmentList)
 		md.fragments[key] = fl
 	}
 	md.Unlock()
 
-	out, err := fl.insert(ms)
+	assembled, err := fl.insert(f)
+
+	// TODO: cleanup too old fragment keys with no hope to be assembled
 
 	// drop fragment list if maximum fragment list length is achieved
-	if out == nil && fl.List.Len() + 1 > MaxFragmentsListLength {
+	if assembled == nil && fl.List.Len() + 1 > MaxFragmentsListLength {
 		md.flush(key)
 		return nil, ErrMStreamTooManyFragments{Number: MaxFragmentsListLength}
 	}
 
-	// packet is defragmented
-	if out != nil {
+	// fragments are assembled into whole frame
+	if assembled != nil {
 		md.flush(key)
-		return out, nil
+		return assembled, nil
 	}
 
 	return nil, err

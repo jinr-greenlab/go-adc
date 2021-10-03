@@ -58,15 +58,16 @@ type MStreamFragment struct {
 	DeviceID       uint8
 	FragmentID     uint16
 	FragmentOffset uint16
+	Data []byte
 	// Fragment contains either MStreamTrigger or MStreamData, not both of them at the same time
-	MStreamTrigger
-	MStreamData
+	//*MStreamTrigger
+	//*MStreamData
 }
 
 // MStreamLayer ...
 type MStreamLayer struct {
 	layers.BaseLayer
-	Fragments []MStreamFragment
+	Fragments []*MStreamFragment
 }
 
 var MStreamLayerType = gopacket.RegisterLayerType(MStreamLayerNum,
@@ -79,7 +80,7 @@ func (ms *MStreamLayer) LayerType() gopacket.LayerType {
 
 
 // SerializeMStreamData ...
-func (mst MStreamTrigger) Serialize(buf []byte) error {
+func (mst *MStreamTrigger) Serialize(buf []byte) error {
 	binary.LittleEndian.PutUint32(buf[0:4], mst.DeviceSerial)
 	buf[4] = uint8(mst.EventNum & 0xff)
 	binary.LittleEndian.PutUint16(buf[5:7], uint16((mst.EventNum & 0xffff00) >> 8))
@@ -91,7 +92,7 @@ func (mst MStreamTrigger) Serialize(buf []byte) error {
 }
 
 // SerializeMStreamData ...
-func (msd MStreamData) Serialize(buf []byte) error {
+func (msd *MStreamData) Serialize(buf []byte) error {
 	binary.LittleEndian.PutUint32(buf[0:4], msd.DeviceSerial)
 	buf[4] = uint8(msd.EventNum & 0xff)
 	binary.LittleEndian.PutUint16(buf[5:7], uint16((msd.EventNum & 0xffff00) >> 8))
@@ -103,7 +104,6 @@ func (msd MStreamData) Serialize(buf []byte) error {
 
 // SerializeTo serializes the MStream layer into bytes and writes the bytes to the SerializeBuffer
 func (ms *MStreamLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) error {
-
 	for _, fragment := range ms.Fragments {
 		headerBytes, err := b.AppendBytes(8)
 		if err != nil {
@@ -118,39 +118,34 @@ func (ms *MStreamLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Se
 		if err != nil {
 			return err
 		}
-		if fragment.Subtype == MStreamTriggerSubtype {
-			fragment.MStreamTrigger.Serialize(payloadBytes)
-		} else {
-			fragment.MStreamData.Serialize(payloadBytes)
-		}
+		copy(payloadBytes, fragment.Data)
 	}
 
 	return nil
 }
 
 // DecodeMStreamData ...
-func DecodeMStreamData(fragmentPayload []byte, fragment MStreamFragment) error {
+func DecodeMStreamData(fragmentPayload []byte) (*MStreamData, error) {
 	if len(fragmentPayload) < 8 {
-		return errors.New("MStream data packet too short. Must at least have data header.")
+		return nil, errors.New("MStream data packet too short. Must at least have data header.")
 	}
-	fragment.MStreamData = MStreamData{
+	return &MStreamData{
 		DeviceSerial: binary.LittleEndian.Uint32(fragmentPayload[0:4]),
 		EventNum: binary.LittleEndian.Uint32(fragmentPayload[4:7]),
 		ChannelNum: fragmentPayload[7],
 		Data: fragmentPayload[8:],
-	}
-	return nil
+	}, nil
 }
 
 // DecodeMStreamTrigger ...
-func DecodeMStreamTrigger(fragmentPayload []byte, fragment MStreamFragment) error {
+func DecodeMStreamTrigger(fragmentPayload []byte) (*MStreamTrigger, error) {
 	if len(fragmentPayload) < 24 {
-		return errors.New("MStream trigger packet too short. Must be at least 24 bytes.")
+		return nil, errors.New("MStream trigger packet too short. Must be at least 24 bytes.")
 	}
 
 	taiNSecFlags := binary.LittleEndian.Uint32(fragmentPayload[12:16])
 
-	fragment.MStreamTrigger = MStreamTrigger{
+	return &MStreamTrigger{
 		DeviceSerial: binary.LittleEndian.Uint32(fragmentPayload[0:4]),
 		EventNum: binary.LittleEndian.Uint32(fragmentPayload[4:7]),
 		TaiSec: binary.LittleEndian.Uint32(fragmentPayload[8:12]),
@@ -158,9 +153,7 @@ func DecodeMStreamTrigger(fragmentPayload []byte, fragment MStreamFragment) erro
 		TaiNSec: taiNSecFlags >> 2,
 		LowCh: binary.LittleEndian.Uint32(fragmentPayload[16:20]),
 		HiCh: binary.LittleEndian.Uint32(fragmentPayload[20:24]),
-	}
-
-	return nil
+	}, nil
 }
 
 // DecodeFragment ...
@@ -182,27 +175,28 @@ func (ms *MStreamLayer) DecodeFragment(offset int, data []byte) (int, error) {
 	fragmentID := uint16(fragmentOffsetID >> 16) // FragmentID takes 2 bytes for MStream 2.x
 	fragmentOffset := uint16(fragmentOffsetID & 0xffff) // FragmentOffset takes 2 bytes for MStream 2.x
 
-	fragment := MStreamFragment{
+	fragment := &MStreamFragment{
 		FragmentLength: fragmentLength,
 		Subtype: subtype,
 		Flags: flags,
 		DeviceID: deviceID,
 		FragmentID: fragmentID,
 		FragmentOffset: fragmentOffset,
+		Data: data[offset + 8:newOffset],
 	}
 
-	// Decoding fragment payload which is one of MStreamTrigger or MStreamData
-	// We call fragment payload decoders not with the whole MStream packet but with
-	// the actual payload of a fragment excluding fragment header
-	mstreamPayloadDecoders := map[uint8]func([]byte, MStreamFragment) error{
-		MStreamTriggerSubtype: DecodeMStreamTrigger,
-		MStreamDataSubtype: DecodeMStreamData,
-	}
-
-	err := mstreamPayloadDecoders[subtype](data[offset + 8:newOffset], fragment)
-	if err != nil {
-		return newOffset, err
-	}
+	//// Decoding fragment payload which is one of MStreamTrigger or MStreamData
+	//// We call fragment payload decoders not with the whole MStream packet but with
+	//// the actual payload of a fragment excluding fragment header
+	//mstreamPayloadDecoders := map[uint8]func([]byte, *MStreamFragment) error{
+	//	MStreamTriggerSubtype: DecodeMStreamTrigger,
+	//	MStreamDataSubtype: DecodeMStreamData,
+	//}
+	//
+	//err := mstreamPayloadDecoders[subtype](data[offset + 8:newOffset], fragment)
+	//if err != nil {
+	//	return newOffset, err
+	//}
 
 	ms.Fragments = append(ms.Fragments, fragment)
 
@@ -235,27 +229,27 @@ func (ms *MStreamLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback)
 	return nil
 }
 
-func (msf MStreamFragment) LastFragment() bool {
-	return ((msf.Flags >> 5) & 0b00000001) == 1
+func (f *MStreamFragment) LastFragment() bool {
+	return ((f.Flags >> 5) & 0b00000001) == 1
 }
 
-func (msf MStreamFragment) SetLastFragment(last bool) {
+func (f *MStreamFragment) SetLastFragment(last bool) {
 	if last {
-		msf.Flags |= 0b00100000
+		f.Flags |= 0b00100000
 	} else {
-		msf.Flags &= 0b11011111
+		f.Flags &= 0b11011111
 	}
 }
 
-func (msf MStreamFragment) Ack() bool {
-	return ((msf.Flags >> 4) & 0b00000001) == 1
+func (f *MStreamFragment) Ack() bool {
+	return ((f.Flags >> 4) & 0b00000001) == 1
 }
 
-func (msf MStreamFragment) SetAck(ack bool) {
+func (f *MStreamFragment) SetAck(ack bool) {
 	if ack {
-		msf.Flags |= 0b00010000
+		f.Flags |= 0b00010000
 	} else {
-		msf.Flags &= 0b11101111
+		f.Flags &= 0b11101111
 	}
 }
 
