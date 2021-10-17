@@ -41,9 +41,9 @@ const (
 	MLinkEndpointNum = 1000
 	// MLinkSync is a magic number that appears in the beginning of each MLink frame
 	MLinkSync = 0x2A50
-	// MLink is the last word of each MLink frame, they call it MLINK_DATA_PADDING_MAGIC or CRC
+	// MLink CRC is the last word of each MLink frame
 	// For MStream ACK frames it is 0x00000000
-	// For MStream frames sent from a device to host it is 0x12206249
+	// For MStream frames sent from a device to host it is 0x12206249, they call it MLINK_DATA_PADDING_MAGIC
 	// For register r/w request it is crc32 sum
 	// For register r/w response it is 0x00000000
 	MLinkMStreamCRC = 0x12206249

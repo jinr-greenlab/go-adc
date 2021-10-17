@@ -25,33 +25,51 @@ import (
 const (
 	// MStreamLayerNum identifies the layer
 	MStreamLayerNum = 1998
-	MStreamTriggerSubtype uint8 = 0
-	MStreamDataSubtype uint8 = 1
 )
+
+type Subtype uint8
+
+const (
+	MStreamTriggerSubtype Subtype = iota
+	MStreamDataSubtype
+)
+
+// mstream-lib/types.h
+
+type MStreamPayloadHeader struct {
+	DeviceSerial uint32
+	EventNum uint32 // 24 bits
+}
+
 
 // MStreamTrigger ...
 type MStreamTrigger struct {
+	// TODO: deduplicate DeviceSerial and EventNum
 	DeviceSerial uint32
 	EventNum uint32 // 24 bits
 	TaiSec uint32
 	Flags uint8 // 2 bits
 	TaiNSec uint32 // 30 bits
+	// TODO: Put these two fields into one uint64
 	LowCh uint32
 	HiCh uint32
 }
 
+type ChannelNum uint8
+
 // MStreamData ...
 type MStreamData struct {
+	// TODO: deduplicate DeviceSerial and EventNum
 	DeviceSerial uint32
 	EventNum uint32 // 24 bits
-	ChannelNum uint8
+	ChannelNum
 	Data []byte
 }
 
 // MStreamFragment ...
 type MStreamFragment struct {
 	FragmentLength uint16 // length of fragment payload NOT including MStream header in bytes
-	Subtype        uint8 // 2 bits
+	Subtype // 2 bits
 	Flags          uint8 // 6 bits
 	// 0xd9 for ADC64VE-XGE
 	// 0xdf for ADC64VE-V3-XG
@@ -59,9 +77,11 @@ type MStreamFragment struct {
 	FragmentID     uint16
 	FragmentOffset uint16
 	Data []byte
+
+	*MStreamPayloadHeader
 	// Fragment contains either MStreamTrigger or MStreamData, not both of them at the same time
-	//*MStreamTrigger
-	//*MStreamData
+	*MStreamTrigger
+	*MStreamData
 }
 
 // MStreamLayer ...
@@ -96,7 +116,7 @@ func (msd *MStreamData) Serialize(buf []byte) error {
 	binary.LittleEndian.PutUint32(buf[0:4], msd.DeviceSerial)
 	buf[4] = uint8(msd.EventNum & 0xff)
 	binary.LittleEndian.PutUint16(buf[5:7], uint16((msd.EventNum & 0xffff00) >> 8))
-	buf[7] = msd.ChannelNum
+	buf[7] = uint8(msd.ChannelNum)
 	copy(buf[8:], msd.Data)
 	return nil
 }
@@ -110,7 +130,7 @@ func (ms *MStreamLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Se
 			return err
 		}
 		binary.LittleEndian.PutUint16(headerBytes[0:2], fragment.FragmentLength)
-		headerBytes[2] = (fragment.Flags << 2) | fragment.Subtype
+		headerBytes[2] = (fragment.Flags << 2) | uint8(fragment.Subtype)
 		headerBytes[3] = fragment.DeviceID
 		binary.LittleEndian.PutUint32(headerBytes[4:8], (uint32(fragment.FragmentID) << 16) | uint32(fragment.FragmentOffset))
 
@@ -132,7 +152,7 @@ func DecodeMStreamData(fragmentPayload []byte) (*MStreamData, error) {
 	return &MStreamData{
 		DeviceSerial: binary.LittleEndian.Uint32(fragmentPayload[0:4]),
 		EventNum: binary.LittleEndian.Uint32(fragmentPayload[4:7]),
-		ChannelNum: fragmentPayload[7],
+		ChannelNum: ChannelNum(fragmentPayload[7]),
 		Data: fragmentPayload[8:],
 	}, nil
 }
@@ -153,6 +173,14 @@ func DecodeMStreamTrigger(fragmentPayload []byte) (*MStreamTrigger, error) {
 		TaiNSec: taiNSecFlags >> 2,
 		LowCh: binary.LittleEndian.Uint32(fragmentPayload[16:20]),
 		HiCh: binary.LittleEndian.Uint32(fragmentPayload[20:24]),
+	}, nil
+}
+
+// DecodeMStreamPayloadHeader ...
+func DecodeMStreamPayloadHeader(fragmentPayload []byte) (*MStreamPayloadHeader, error) {
+	return &MStreamPayloadHeader{
+		DeviceSerial: binary.LittleEndian.Uint32(fragmentPayload[0:4]),
+		EventNum: binary.LittleEndian.Uint32(fragmentPayload[4:7]),
 	}, nil
 }
 
@@ -177,26 +205,13 @@ func (ms *MStreamLayer) DecodeFragment(offset int, data []byte) (int, error) {
 
 	fragment := &MStreamFragment{
 		FragmentLength: fragmentLength,
-		Subtype: subtype,
+		Subtype: Subtype(subtype),
 		Flags: flags,
 		DeviceID: deviceID,
 		FragmentID: fragmentID,
 		FragmentOffset: fragmentOffset,
 		Data: data[offset + 8:newOffset],
 	}
-
-	//// Decoding fragment payload which is one of MStreamTrigger or MStreamData
-	//// We call fragment payload decoders not with the whole MStream packet but with
-	//// the actual payload of a fragment excluding fragment header
-	//mstreamPayloadDecoders := map[uint8]func([]byte, *MStreamFragment) error{
-	//	MStreamTriggerSubtype: DecodeMStreamTrigger,
-	//	MStreamDataSubtype: DecodeMStreamData,
-	//}
-	//
-	//err := mstreamPayloadDecoders[subtype](data[offset + 8:newOffset], fragment)
-	//if err != nil {
-	//	return newOffset, err
-	//}
 
 	ms.Fragments = append(ms.Fragments, fragment)
 
@@ -250,6 +265,36 @@ func (f *MStreamFragment) SetAck(ack bool) {
 		f.Flags |= 0b00010000
 	} else {
 		f.Flags &= 0b11101111
+	}
+}
+
+// DecodePayload decodes payload of MStream fragment
+// It is assumed to be one of MStreamTrigger or MStreamData
+// This method must be called only for defragmented (assembled) frames
+func (f *MStreamFragment) DecodePayload() error {
+	payloadHeader, err := DecodeMStreamPayloadHeader(f.Data)
+	if err != nil {
+		return errors.New("Error while decoding payload header of MStream fragment")
+	}
+	f.MStreamPayloadHeader = payloadHeader
+
+	switch f.Subtype {
+	case MStreamTriggerSubtype:
+		trigger, err := DecodeMStreamTrigger(f.Data)
+		if err != nil {
+			return errors.New("Error while decoding payload of MStream trigger fragment")
+		}
+		f.MStreamTrigger = trigger
+		return nil
+	case MStreamDataSubtype:
+		data, err := DecodeMStreamData(f.Data)
+		if err != nil {
+			return errors.New("Error while decoding payload of MStream data fragment")
+		}
+		f.MStreamData = data
+		return nil
+	default:
+		return errors.New("Unknown fragment subtype")
 	}
 }
 

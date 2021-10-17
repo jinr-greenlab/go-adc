@@ -105,6 +105,7 @@ func (s *MStreamServer) Run() error {
 	go func() {
 		source := gopacket.NewPacketSource(s, layers.MLinkLayerType)
 		defragmenter := layers.NewMStreamDefragmenter()
+		eventBuilder := NewEventBuilder()
 		for packet := range source.Packets() {
 			log.Debug("MStream frame received")
 			log.Debug(packet.Dump())
@@ -113,14 +114,14 @@ func (s *MStreamServer) Run() error {
 				log.Debug("MStream frame successfully parsed")
 				layer := layer.(*layers.MStreamLayer)
 
-				deviceName, handleErr := GetDeviceName(packet);
-				if handleErr != nil {
+				deviceName, err := GetDeviceName(packet);
+				if err != nil {
 					log.Error("Error while trying to get device name from packet")
 					continue
 				}
 
-				udpaddr, handleErr := GetAddrPort(packet)
-				if handleErr != nil {
+				udpaddr, err := GetAddrPort(packet)
+				if err != nil {
 					log.Error("Error while getting udpaddr for a packet from input queue")
 					continue
 				}
@@ -129,15 +130,19 @@ func (s *MStreamServer) Run() error {
 					log.Debug("Handling fragment: FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t",
 						f.FragmentID, f.FragmentOffset, f.LastFragment())
 
-					s.SendAck(f.FragmentID, f.FragmentOffset, udpaddr)
+					err := s.SendAck(f.FragmentID, f.FragmentOffset, udpaddr)
+					if err != nil {
+						log.Error("Error while sending Ack for fragment: ID: %d Offset: %d Length: %d",
+							f.FragmentID, f.FragmentOffset, f.FragmentLength)
+					}
 
 					if f.Subtype == layers.MStreamTriggerSubtype && !f.LastFragment() {
 						log.Error("!!! Something really bad is happening. Trigger data is fragmented.")
 						continue
 					}
 
-					assembled, handleErr := defragmenter.Defrag(f, deviceName)
-					if handleErr != nil {
+					assembled, err := defragmenter.Defrag(f, deviceName)
+					if err != nil {
 						log.Error("Error while trying to handle MStream fragment")
 						continue
 					} else if assembled == nil {
@@ -145,9 +150,13 @@ func (s *MStreamServer) Run() error {
 						continue
 					}
 
-					// Here assembled must be not nil
-					log.Debug("!!! Frame assembled: ID: %d Offset: %d Length: %d",
-						f.FragmentID, f.FragmentOffset, f.FragmentLength)
+					log.Debug("Assembled fragment: ID: %d Offset: %d Lenght: %d",
+						assembled.FragmentID, assembled.FragmentOffset, assembled.FragmentLength)
+
+					if err = f.DecodePayload(); err != nil {
+						log.Error("Error while decoding MStream fragment payload")
+					}
+					eventBuilder.SetFragment(assembled)
 				}
 			}
 		}
