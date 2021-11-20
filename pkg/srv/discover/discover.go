@@ -12,7 +12,7 @@
  limitations under the License.
 */
 
-package srv
+package discover
 
 import (
 	"context"
@@ -26,6 +26,7 @@ import (
 
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
+	"jinr.ru/greenlab/go-adc/pkg/srv"
 )
 
 const (
@@ -41,11 +42,13 @@ const (
  */
 
 type DiscoverServer struct {
-	Server
+	srv.Server
 	*net.Interface
+	state *State
+	api *ApiServer
 }
 
-func NewDiscoverServer(cfg *config.Config) (*DiscoverServer, error) {
+func NewDiscoverServer(ctx context.Context, cfg *config.Config) (*DiscoverServer, error) {
 	log.Debug("Initializing discover server with address: %s port: %d iface: %s",
 		cfg.DiscoverIP, DiscoverPort, cfg.DiscoverIface)
 
@@ -59,15 +62,28 @@ func NewDiscoverServer(cfg *config.Config) (*DiscoverServer, error) {
 		return nil, err
 	}
 
+	state, err := NewState(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	s := &DiscoverServer{
-		Server: Server{
+		Server: srv.Server{
 			Context: context.Background(),
 			UDPAddr: uaddr,
-			ChIn: make(chan InPacket),
+			ChIn: make(chan srv.InPacket),
 			Config: cfg,
 		},
 		Interface: iface,
+		state: state,
 	}
+
+	apiServer, err := NewApiServer(ctx, cfg, s)
+	if err != nil {
+		return nil, err
+	}
+	s.api = apiServer
+
 	return s, nil
 }
 
@@ -83,32 +99,7 @@ func (s *DiscoverServer) Run() error {
 	errChan := make(chan error, 1)
 	buffer := make([]byte, 2048)
 
-	// read packets from the chCaptured channel using the ReadPacketData method and parse them
-	// into DeviceDescription struct
-	go func() {
-		source := gopacket.NewPacketSource(s, gopacketlayers.LayerTypeLinkLayerDiscovery)
-		for packet := range source.Packets() {
-			layer := packet.Layer(gopacketlayers.LayerTypeLinkLayerDiscoveryInfo)
-			if layer != nil {
-				layer, ok := layer.(*gopacketlayers.LinkLayerDiscoveryInfo)
-				if !ok {
-					log.Error("Error while asserting to LinkLayerDiscoveryInfo")
-					continue
-				}
-				dd := &layers.DeviceDescription{}
-				layers.DecodeOrgSpecific(layer.OrgTLVs, dd)
-				udpAddr, handleErr := GetAddrPort(packet)
-				if handleErr != nil {
-					// TODO
-					continue
-				}
-				dd.SetSource(udpAddr)
-				fmt.Print(dd.String())
-			}
-		}
-	}()
-
-	// capture discovery packets from the wire and put them into the chCaptured channel
+	// Read UDP packets from wire and put them to input queue
 	go func() {
 		for {
 			length, addr, captureErr := conn.ReadFrom(buffer)
@@ -131,8 +122,44 @@ func (s *DiscoverServer) Run() error {
 				AncillaryData: []interface{}{udpAddr},
 			}
 
-			s.ChIn <- InPacket{Data: buffer[:length], CaptureInfo: captureInfo}
+			s.ChIn <- srv.InPacket{Data: buffer[:length], CaptureInfo: captureInfo}
 		}
+	}()
+
+	// Read captured packets from input queue, parse them and update the discover database
+	go func() {
+		source := gopacket.NewPacketSource(s, gopacketlayers.LayerTypeLinkLayerDiscovery)
+		for packet := range source.Packets() {
+			layer := packet.Layer(gopacketlayers.LayerTypeLinkLayerDiscoveryInfo)
+			if layer != nil {
+				layer, ok := layer.(*gopacketlayers.LinkLayerDiscoveryInfo)
+				if !ok {
+					log.Error("Error while asserting to LinkLayerDiscoveryInfo")
+					continue
+				}
+				dd := &layers.DeviceDescription{}
+				layers.DecodeOrgSpecific(layer.OrgTLVs, dd)
+				udpAddr, handleErr := srv.GetAddrPort(packet)
+				if handleErr != nil {
+					// TODO
+					continue
+				}
+				dd.SetSource(udpAddr)
+
+				if err := s.state.CreateBucket(BucketName(dd.SerialNumber)); err != nil {
+					log.Error("Error while creating bucket: device: %s", dd.SerialNumber)
+					continue
+				}
+				if err := s.state.SetDeviceDescription(dd); err != nil {
+					log.Error("Error while updating device description: device: %s", dd.SerialNumber)
+					continue
+				}
+			}
+		}
+	}()
+
+	go func() {
+		s.api.Run()
 	}()
 
 	select {

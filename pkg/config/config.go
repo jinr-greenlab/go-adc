@@ -32,6 +32,7 @@ type Device struct {
 type Config struct {
 	DiscoverIP *net.IP `json:"discoverIP,omitempty"`
 	DiscoverIface string `json:"discoverIface,omitempty"`
+	DiscoverDBPath string `json:"discoverDBPath"`
 	IP *net.IP `json:"ip,omitempty"`
 	Devices []*Device `json:"devices"`
 	DBPath string `json:"dbpath,omitempty"`
@@ -59,6 +60,8 @@ func (c *Config) Persist(overwrite bool) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Fprintf(os.Stdout, "Config is saved into file: %s\n", c.filepath)
 
 	return nil
 }

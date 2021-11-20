@@ -17,6 +17,7 @@ package srv
 import (
 	"context"
 	"net"
+	"time"
 
 	"github.com/google/gopacket"
 
@@ -76,4 +77,8 @@ func (s *Server) ReadPacketData() (data []byte, captureInfo gopacket.CaptureInfo
 	data = packet.Data
 	captureInfo = packet.CaptureInfo
 	return
+}
+
+func Now() uint64 {
+	return uint64(time.Now().UnixNano()) * uint64(time.Nanosecond) / uint64(time.Millisecond)
 }

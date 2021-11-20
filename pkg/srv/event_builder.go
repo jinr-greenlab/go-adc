@@ -87,11 +87,6 @@ func countDataFragments(channels uint64) (count uint32){
 	return
 }
 
-func now() uint64 {
-	return uint64(time.Now().UnixNano()) * uint64(time.Nanosecond) / uint64(time.Millisecond)
-}
-
-
 func (eb *EventBuilder) CloseEvent() error {
 	if eb.Trigger == nil {
 		log.Error("Can not close event w/o trigger frame")
@@ -113,7 +108,7 @@ func (eb *EventBuilder) CloseEvent() error {
 		MpdTimestampHeader: &layers.MpdTimestampHeader{
 			Sync: layers.MpdTimestampMagic,
 			Length: 8,
-			Timestamp: now(),
+			Timestamp: Now(),
 		},
 		MpdEventHeader: &layers.MpdEventHeader{
 			Sync: layers.MpdSyncMagic,

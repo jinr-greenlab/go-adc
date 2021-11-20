@@ -15,12 +15,13 @@
 package discover
 
 import (
+	"context"
 	"fmt"
 	"github.com/spf13/cobra"
 	"net"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
-	"jinr.ru/greenlab/go-adc/pkg/srv"
+	"jinr.ru/greenlab/go-adc/pkg/srv/discover"
 )
 
 const (
@@ -43,7 +44,9 @@ func NewStartCommand() *cobra.Command {
 			if iface != "" {
 				cfg.DiscoverIface = iface
 			}
-			s, err := srv.NewDiscoverServer(cfg)
+
+			ctx := context.Background()
+			s, err := discover.NewDiscoverServer(ctx, cfg)
 			if err != nil {
 				return err
 			}
