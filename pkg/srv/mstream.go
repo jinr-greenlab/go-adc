@@ -69,6 +69,9 @@ func (s *MStreamServer) Run() error {
 	errChan := make(chan error, 1)
 	buffer := make([]byte, 65536)
 
+	eventBuilder := NewEventBuilder()
+	defer eventBuilder.Close()
+
 	// Read packets from wire and put them to input queue
 	go func() {
 		for {
@@ -105,7 +108,6 @@ func (s *MStreamServer) Run() error {
 	go func() {
 		source := gopacket.NewPacketSource(s, layers.MLinkLayerType)
 		defragmenter := layers.NewMStreamDefragmenter()
-		eventBuilder := NewEventBuilder()
 		for packet := range source.Packets() {
 			log.Debug("MStream frame received")
 			log.Debug(packet.Dump())
@@ -153,7 +155,7 @@ func (s *MStreamServer) Run() error {
 					log.Debug("Assembled fragment: ID: %d Offset: %d Lenght: %d",
 						assembled.FragmentID, assembled.FragmentOffset, assembled.FragmentLength)
 
-					if err = f.DecodePayload(); err != nil {
+					if err = assembled.DecodePayload(); err != nil {
 						log.Error("Error while decoding MStream fragment payload")
 					}
 					eventBuilder.SetFragment(assembled)
