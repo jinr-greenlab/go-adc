@@ -32,7 +32,7 @@ type Device struct {
 type Config struct {
 	DiscoverIP *net.IP `json:"discoverIP,omitempty"`
 	DiscoverIface string `json:"discoverIface,omitempty"`
-	DiscoverDBPath string `json:"discoverDBPath"`
+	DiscoverDBPath string `json:"discoverDBPath,omitempty"`
 	IP *net.IP `json:"ip,omitempty"`
 	Devices []*Device `json:"devices"`
 	DBPath string `json:"dbpath,omitempty"`
@@ -111,6 +111,14 @@ func DefaultDBPath() string {
 	return filepath.Join(home, ConfigDir, DBFile)
 }
 
+func DefaultDiscoverDBPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = ""
+	}
+	return filepath.Join(home, ConfigDir, DiscoverDBFile)
+}
+
 func NewDefaultConfig() *Config {
 	discoverIP := net.ParseIP(DefaultDiscoverIP)
 	ip := net.ParseIP(DefaultIP)
@@ -121,6 +129,7 @@ func NewDefaultConfig() *Config {
 		IP: &ip,
 		Devices: []*Device{},
 		DBPath: DefaultDBPath(),
+		DiscoverDBPath: DefaultDiscoverDBPath(),
 		filepath: DefaultConfigPath(),
 	}
 }
