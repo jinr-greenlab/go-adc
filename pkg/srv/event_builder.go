@@ -18,10 +18,9 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/google/gopacket"
-	"os"
-	"time"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
+	"os"
 )
 
 
@@ -41,29 +40,31 @@ type EventBuilder struct {
 	Data map[layers.ChannelNum]layers.MStreamData
 	Length uint32
 
-	*bufio.Writer
-	*os.File
+	writer *bufio.Writer
+	file *os.File
 }
 
-func NewEventBuilder() *EventBuilder {
+func NewEventBuilder(deviceSerial uint32, fileSuffix string) (*EventBuilder, error) {
 
-	file, err := os.Create(fmt.Sprintf("data-%d.mpd", time.Now().UTC().Format("2006-01-02-15-04-05")))
+	filename := fmt.Sprintf("%04x_%s.data", deviceSerial, fileSuffix)
+	file, err := os.Create(filename)
 	if err != nil {
-
+		log.Error("Error while creating file: %s", filename)
+		return nil, err
 	}
 	writer := bufio.NewWriter(file)
 
 	return &EventBuilder{
 		Free: true,
 		Data: make(map[layers.ChannelNum]layers.MStreamData),
-		File: file,
-		Writer: writer,
-	}
+		file: file,
+		writer: writer,
+	}, nil
 }
 
 func (eb *EventBuilder) Close() {
-	eb.Writer.Flush()
-	eb.File.Close()
+	eb.writer.Flush()
+	eb.file.Close()
 }
 
 func (eb *EventBuilder) Clear() {
@@ -88,9 +89,10 @@ func countDataFragments(channels uint64) (count uint32){
 }
 
 func (eb *EventBuilder) CloseEvent() error {
+	defer eb.Clear()
+
 	if eb.Trigger == nil {
 		log.Error("Can not close event w/o trigger frame")
-		eb.Clear()
 		return nil
 	}
 
@@ -132,8 +134,9 @@ func (eb *EventBuilder) CloseEvent() error {
 		return err
 	}
 
-	_, err = eb.Writer.Write(buf.Bytes())
+	_, err = eb.writer.Write(buf.Bytes())
 	if err != nil {
+		log.Error("Error while closing event: device: %04x event: %d", eb.DeviceSerial, eb.EventNum)
 		return err
 	}
 	return nil
@@ -171,4 +174,33 @@ func (eb *EventBuilder) SetFragment(f *layers.MStreamFragment) {
 	}
 }
 
+type EventHandler struct {
+	eventBuilders map[uint32]*EventBuilder
+	fileSuffix string
+}
 
+func NewEventHandler(fileSuffix string) *EventHandler {
+	return &EventHandler{
+		eventBuilders: make(map[uint32]*EventBuilder),
+		fileSuffix: fileSuffix,
+	}
+}
+
+func (eh *EventHandler) Close() {
+	for _, eb := range eh.eventBuilders {
+		eb.Close()
+	}
+}
+
+func (eh *EventHandler) SetFragment(f *layers.MStreamFragment) {
+	deviceSerial := f.MStreamPayloadHeader.DeviceSerial
+	eventBuilder, ok := eh.eventBuilders[deviceSerial]
+	if !ok {
+		eventBuilder, err := NewEventBuilder(deviceSerial, eh.fileSuffix)
+		if err != nil {
+			log.Error("Error while creating event builder: device: %04x", deviceSerial)
+		}
+		eh.eventBuilders[deviceSerial] = eventBuilder
+	}
+	eventBuilder.SetFragment(f)
+}

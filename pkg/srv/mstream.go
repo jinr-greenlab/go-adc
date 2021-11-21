@@ -69,8 +69,10 @@ func (s *MStreamServer) Run() error {
 	errChan := make(chan error, 1)
 	buffer := make([]byte, 65536)
 
-	eventBuilder := NewEventBuilder()
-	defer eventBuilder.Close()
+	fileSuffix := time.Now().UTC().Format("20060102_150405")
+
+	eventHandler := NewEventHandler(fileSuffix)
+	defer eventHandler.Close()
 
 	// Read packets from wire and put them to input queue
 	go func() {
@@ -158,7 +160,8 @@ func (s *MStreamServer) Run() error {
 					if err = assembled.DecodePayload(); err != nil {
 						log.Error("Error while decoding MStream fragment payload")
 					}
-					eventBuilder.SetFragment(assembled)
+
+					eventHandler.SetFragment(assembled)
 				}
 			}
 		}
