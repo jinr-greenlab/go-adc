@@ -18,9 +18,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"encoding/binary"
 	"go.etcd.io/bbolt"
-	"jinr.ru/greenlab/go-adc/pkg/srv"
+	"os"
+	"sigs.k8s.io/yaml"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
@@ -30,6 +30,7 @@ import (
 
 const (
 	BucketPrefix = "discover_"
+	DeviceDescriptionKey = "device_description"
 )
 
 type State struct {
@@ -72,11 +73,11 @@ func BucketName(deviceName string) string {
 	return fmt.Sprintf("%s%s", BucketPrefix, deviceName)
 }
 
-func uint64ToByte(v uint64) []byte {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, v)
-	return b
-}
+//func uint64ToByte(v uint64) []byte {
+//	b := make([]byte, 8)
+//	binary.BigEndian.PutUint64(b, v)
+//	return b
+//}
 
 // SetDeviceDescription ...
 func (s *State) SetDeviceDescription(dd *layers.DeviceDescription) error {
@@ -86,10 +87,11 @@ func (s *State) SetDeviceDescription(dd *layers.DeviceDescription) error {
 		if b == nil {
 			return errors.New(fmt.Sprintf("Bucket not found: %s", BucketName(dd.SerialNumber)))
 		}
-		if err := b.Put([]byte("description"), []byte(dd.String())); err != nil {
+		ddBytes, err := yaml.Marshal(dd)
+		if err != nil {
 			return err
 		}
-		if err := b.Put([]byte("timestamp"), uint64ToByte(srv.Now())); err != nil {
+		if err := b.Put([]byte(DeviceDescriptionKey), ddBytes); err != nil {
 			return err
 		}
 		return nil
@@ -109,17 +111,14 @@ func (s *State) GetDeviceDescription(serialNumber string) (string, uint64, error
 		if b == nil {
 			return errors.New(fmt.Sprintf("Bucket not found: %s", BucketName(serialNumber)))
 		}
-		descriptionBytes := b.Get([]byte("description"))
-		if descriptionBytes == nil {
+		ddBytes := b.Get([]byte(DeviceDescriptionKey))
+		if ddBytes == nil {
 			return errors.New(fmt.Sprintf("Description not found", ))
 		}
-		description = string(descriptionBytes)
-
-		timestampBytes := b.Get([]byte("timestamp"))
-		if timestampBytes == nil {
-			return errors.New(fmt.Sprintf("Timestamp not found", ))
+		var dd *layers.DeviceDescription
+		if err := yaml.Unmarshal(ddBytes, dd); err != nil {
+			return err
 		}
-		timestamp = binary.BigEndian.Uint64(timestampBytes)
 		return nil
 	}); err != nil {
 		return "", 0, err
@@ -127,37 +126,33 @@ func (s *State) GetDeviceDescription(serialNumber string) (string, uint64, error
 	return description, timestamp, nil
 }
 
-type DeviceDescription struct {
-	description string
-	timestamp uint64
-}
-
 // GetAllDeviceDescriptions ...
-func (s *State) GetAllDeviceDescriptions() ([]DeviceDescription, error) {
+func (s *State) GetAllDeviceDescriptions() ([]*layers.DeviceDescription, error) {
 	log.Debug("Getting all device descriptions")
-	var all []DeviceDescription
+	var devices []*layers.DeviceDescription
 	if err := s.DB.View(func(tx *bbolt.Tx) error {
 		tx.ForEach(func(_ []byte, b *bbolt.Bucket) error {
-			descriptionBytes := b.Get([]byte("description"))
-			if descriptionBytes == nil {
+			ddBytes := b.Get([]byte(DeviceDescriptionKey))
+			if ddBytes == nil {
 				return errors.New(fmt.Sprintf("Description not found", ))
 			}
-
-			timestampBytes := b.Get([]byte("timestamp"))
-			if timestampBytes == nil {
-				return errors.New(fmt.Sprintf("Timestamp not found", ))
+			fmt.Fprintf(os.Stderr, "bytes\n")
+			fmt.Fprintf(os.Stderr, string(ddBytes))
+			dd := &layers.DeviceDescription{}
+			if err := yaml.Unmarshal(ddBytes, dd); err != nil {
+				log.Error("Error while unmarshalling DeviceDescription %s\n", err)
+				return err
 			}
+			fmt.Fprintf(os.Stderr, "unmarshalled\n")
 
-			all = append(all, DeviceDescription{
-				description: string(descriptionBytes),
-				timestamp: binary.BigEndian.Uint64(timestampBytes),
-			})
+			fmt.Fprintf(os.Stderr, dd.String())
+			devices = append(devices, dd)
 			return nil
 		})
 		return nil
 	}); err != nil {
 		return nil, err
 	}
-	return all, nil
+	return devices, nil
 }
 

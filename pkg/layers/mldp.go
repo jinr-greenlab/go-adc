@@ -16,10 +16,12 @@ package layers
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/gopacket/layers"
 	"sigs.k8s.io/yaml"
@@ -57,13 +59,33 @@ type Mac struct {
 }
 
 func (m *Mac) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("\"%s\"", m.String())), nil
+	return json.Marshal(m.String())
+}
+
+func (m *Mac) UnmarshalJSON(bytes []byte) error {
+	trimmed := strings.Trim(string(bytes), "\"")
+	mac, err := net.ParseMAC(trimmed)
+	if err != nil {
+		return err
+	}
+	m.HardwareAddr = mac
+	return nil
 }
 
 type DeviceID uint16
 
 func (d *DeviceID) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("\"0x%x\"", *d)), nil
+	return json.Marshal(fmt.Sprintf("0x%02x", uint16(*d)))
+}
+
+func (d *DeviceID) UnmarshalJSON(bytes []byte) error {
+	trimmed := strings.Trim(string(bytes), "\"")
+	deviceID, err := strconv.ParseUint(trimmed, 0, 16)
+	if err != nil {
+		return err
+	}
+	*d = DeviceID(deviceID)
+	return nil
 }
 
 type DeviceDescription struct {
@@ -85,6 +107,7 @@ type DeviceDescription struct {
 	ModelName string `json:"modelName,omitempty"`
 	Address net.IP `json:"address"`
 	Port uint16 `json:"port"`
+	Timestamp uint64 `json:"timestamp,omitempty"`
 }
 
 func (dd *DeviceDescription) SetSource(udpAddr *net.UDPAddr) error {
@@ -95,6 +118,11 @@ func (dd *DeviceDescription) SetSource(udpAddr *net.UDPAddr) error {
 		return err
 	}
 	dd.Port = uint16(convertedPort)
+	return nil
+}
+
+func (dd *DeviceDescription) SetTimestamp() error {
+	dd.Timestamp = uint64(time.Now().UnixNano()) * uint64(time.Nanosecond) / uint64(time.Millisecond)
 	return nil
 }
 

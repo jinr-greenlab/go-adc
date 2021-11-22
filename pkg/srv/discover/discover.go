@@ -145,13 +145,14 @@ func (s *DiscoverServer) Run() error {
 					continue
 				}
 				dd.SetSource(udpAddr)
+				dd.SetTimestamp()
 
 				if err := s.state.CreateBucket(BucketName(dd.SerialNumber)); err != nil {
 					log.Error("Error while creating bucket: device: %s", dd.SerialNumber)
 					continue
 				}
 				if err := s.state.SetDeviceDescription(dd); err != nil {
-					log.Error("Error while updating device description: device: %s", dd.SerialNumber)
+					log.Error("Error while updating device description: device: %s error: %s", dd.SerialNumber, err)
 					continue
 				}
 			}
