@@ -67,7 +67,7 @@ func (s *MStreamServer) Run() error {
 	defer conn.Close()
 
 	errChan := make(chan error, 1)
-	buffer := make([]byte, 65536)
+	buffer := make([]byte, 1048576)
 
 	fileSuffix := time.Now().UTC().Format("20060102_150405")
 
@@ -111,8 +111,8 @@ func (s *MStreamServer) Run() error {
 		source := gopacket.NewPacketSource(s, layers.MLinkLayerType)
 		defragmenter := layers.NewMStreamDefragmenter()
 		for packet := range source.Packets() {
-			log.Debug("MStream frame received")
-			log.Debug(packet.Dump())
+			//log.Debug("MStream frame received")
+			//log.Debug(packet.Dump())
 			layer := packet.Layer(layers.MStreamLayerType)
 			if layer != nil {
 				log.Debug("MStream frame successfully parsed")

@@ -37,7 +37,7 @@ type EventBuilder struct {
 	DeviceID uint8
 
 	Trigger *layers.MStreamTrigger
-	Data map[layers.ChannelNum]layers.MStreamData
+	Data map[layers.ChannelNum]*layers.MStreamData
 	Length uint32
 
 	writer *bufio.Writer
@@ -46,7 +46,7 @@ type EventBuilder struct {
 
 func NewEventBuilder(deviceSerial uint32, fileSuffix string) (*EventBuilder, error) {
 
-	filename := fmt.Sprintf("%04x_%s.data", deviceSerial, fileSuffix)
+	filename := fmt.Sprintf("%08x_%s.data", deviceSerial, fileSuffix)
 	file, err := os.Create(filename)
 	if err != nil {
 		log.Error("Error while creating file: %s", filename)
@@ -54,12 +54,12 @@ func NewEventBuilder(deviceSerial uint32, fileSuffix string) (*EventBuilder, err
 	}
 	writer := bufio.NewWriter(file)
 
-	return &EventBuilder{
-		Free: true,
-		Data: make(map[layers.ChannelNum]layers.MStreamData),
+	builder := &EventBuilder{
 		file: file,
 		writer: writer,
-	}, nil
+	}
+	builder.Clear()
+	return builder, nil
 }
 
 func (eb *EventBuilder) Close() {
@@ -73,7 +73,7 @@ func (eb *EventBuilder) Clear() {
 	eb.TriggerChannels = 0
 	eb.DataChannels = 0
 	eb.Trigger = nil
-	eb.Data = make(map[layers.ChannelNum]layers.MStreamData)
+	eb.Data = make(map[layers.ChannelNum]*layers.MStreamData)
 	eb.DataSize = 0
 	eb.DeviceSerial = 0
 	eb.Length = 0
@@ -120,7 +120,7 @@ func (eb *EventBuilder) CloseEvent() error {
 		MpdDeviceHeader: &layers.MpdDeviceHeader{
 			DeviceSerial: eb.DeviceSerial,
 			DeviceID: eb.DeviceID,
-			Length: eb.Length + (dataCount + 1) * 4,
+			Length: deviceHeaderLength,
 		},
 		Trigger: eb.Trigger,
 		Data: eb.Data,
@@ -155,8 +155,12 @@ func (eb *EventBuilder) SetFragment(f *layers.MStreamFragment) {
 		eb.Free = false
 		eb.EventNum = f.MStreamPayloadHeader.EventNum
 		eb.DeviceSerial = f.MStreamPayloadHeader.DeviceSerial
-		eb.Length += uint32(f.FragmentLength)
 	}
+
+	// We substruct 8 bytes from the fragment length because fragment payload has
+	// its own header MStreamPayloadHeader which is not included when we serialize
+	// trigger and data when writing to MPD file.
+	eb.Length += uint32(f.FragmentLength - 8)
 
 	if f.Subtype == layers.MStreamTriggerSubtype {
 		eb.DeviceID = f.DeviceID
@@ -192,15 +196,17 @@ func (eh *EventHandler) Close() {
 	}
 }
 
-func (eh *EventHandler) SetFragment(f *layers.MStreamFragment) {
+func (eh *EventHandler) SetFragment(f *layers.MStreamFragment) error {
 	deviceSerial := f.MStreamPayloadHeader.DeviceSerial
-	eventBuilder, ok := eh.eventBuilders[deviceSerial]
+	_, ok := eh.eventBuilders[deviceSerial]
 	if !ok {
 		eventBuilder, err := NewEventBuilder(deviceSerial, eh.fileSuffix)
 		if err != nil {
 			log.Error("Error while creating event builder: device: %04x", deviceSerial)
+			return err
 		}
 		eh.eventBuilders[deviceSerial] = eventBuilder
 	}
-	eventBuilder.SetFragment(f)
+	eh.eventBuilders[deviceSerial].SetFragment(f)
+	return nil
 }

@@ -190,7 +190,8 @@ func (ml *MLinkLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) e
 	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	// This check is only valid for MStream
 	if ml.Type == MLinkTypeMStream && ml.Crc != MLinkMStreamCRC {
-		return errors.New(fmt.Sprintf("Wrong MLink tail for MStream frame. Must be 0x%08x", MLinkMStreamCRC))
+		msg := fmt.Sprintf("Wrong MLink tail for MStream frame. Must be 0x%08x", MLinkMStreamCRC)
+		log.Error(msg)
 	}
 
 	return nil
