@@ -153,10 +153,6 @@ func (s *ApiServer) handleRegWrite() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 
-		type RegHex struct {
-			Addr, Value string
-		}
-
 		regHex := &RegHex{}
 		err := json.NewDecoder(r.Body).Decode(regHex)
 		if err != nil {

@@ -12,7 +12,7 @@
  limitations under the License.
 */
 
-package srv
+package mstream
 
 import (
 	"context"
@@ -27,6 +27,7 @@ import (
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
+	"jinr.ru/greenlab/go-adc/pkg/srv"
 )
 
 const (
@@ -34,11 +35,13 @@ const (
 )
 
 type MStreamServer struct {
-	Server
+	srv.Server
+	EventHandler *EventHandler
+	api *ApiServer
 }
 
-func NewMStreamServer(cfg *config.Config) (*MStreamServer, error) {
-	log.Debug("Initializing mstream server with address: %s port: %d", cfg.IP, MStreamPort)
+func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, error) {
+	log.Info("Initializing mstream server with address: %s port: %d", cfg.IP, MStreamPort)
 
 	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", cfg.IP, MStreamPort))
 	if err != nil {
@@ -46,14 +49,21 @@ func NewMStreamServer(cfg *config.Config) (*MStreamServer, error) {
 	}
 
 	s := &MStreamServer{
-		Server: Server{
-			Context:    context.Background(),
+		Server: srv.Server{
+			Context:    ctx,
 			Config:     cfg,
 			UDPAddr:    uaddr,
-			ChIn:       make(chan InPacket),
-			ChOut:      make(chan OutPacket),
+			ChIn:       make(chan srv.InPacket),
+			ChOut:      make(chan srv.OutPacket),
 		},
+		EventHandler: NewEventHandler(),
 	}
+
+	apiServer, err := NewApiServer(ctx, cfg, s)
+	if err != nil {
+		return nil, err
+	}
+	s.api = apiServer
 
 	return s, nil
 }
@@ -69,10 +79,7 @@ func (s *MStreamServer) Run() error {
 	errChan := make(chan error, 1)
 	buffer := make([]byte, 1048576)
 
-	fileSuffix := time.Now().UTC().Format("20060102_150405")
-
-	eventHandler := NewEventHandler(fileSuffix)
-	defer eventHandler.Close()
+	defer s.EventHandler.Flush()
 
 	// Read packets from wire and put them to input queue
 	go func() {
@@ -102,7 +109,7 @@ func (s *MStreamServer) Run() error {
 				AncillaryData: []interface{}{udpAddr, device.Name},
 			}
 
-			s.ChIn <- InPacket{Data: buffer[:length], CaptureInfo: captureInfo}
+			s.ChIn <- srv.InPacket{Data: buffer[:length], CaptureInfo: captureInfo}
 		}
 	}()
 
@@ -118,13 +125,13 @@ func (s *MStreamServer) Run() error {
 				log.Debug("MStream frame successfully parsed")
 				layer := layer.(*layers.MStreamLayer)
 
-				deviceName, err := GetDeviceName(packet);
+				deviceName, err := srv.GetDeviceName(packet);
 				if err != nil {
 					log.Error("Error while trying to get device name from packet")
 					continue
 				}
 
-				udpaddr, err := GetAddrPort(packet)
+				udpaddr, err := srv.GetAddrPort(packet)
 				if err != nil {
 					log.Error("Error while getting udpaddr for a packet from input queue")
 					continue
@@ -161,7 +168,7 @@ func (s *MStreamServer) Run() error {
 						log.Error("Error while decoding MStream fragment payload")
 					}
 
-					eventHandler.SetFragment(assembled)
+					s.EventHandler.SetFragment(assembled)
 				}
 			}
 		}
@@ -179,6 +186,10 @@ func (s *MStreamServer) Run() error {
 				return
 			}
 		}
+	}()
+
+	go func() {
+		s.api.Run()
 	}()
 
 	err = s.ConnectToDevices()
@@ -231,7 +242,7 @@ func (s *MStreamServer) SendAck(fragmentID, fragmentOffset uint16, udpAddr *net.
 
 	log.Debug("Put MStream Ack to output queue: udpaddr: %s ack: %s", udpAddr, hex.EncodeToString(buf.Bytes()))
 
-	s.ChOut <- OutPacket{
+	s.ChOut <- srv.OutPacket{
 		Data: buf.Bytes(),
 		UDPAddr: udpAddr,
 	}

@@ -12,21 +12,64 @@
  limitations under the License.
 */
 
-package srv
+package mstream
 
 import (
 	"bufio"
 	"fmt"
+	"io"
+	"path"
+	"sync"
 	"github.com/google/gopacket"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
+	"jinr.ru/greenlab/go-adc/pkg/srv"
 	"os"
+	"time"
 )
 
+type Writer struct {
+	*bufio.Writer
+	file *os.File
+	discard bool
+}
 
-// Multiple EventBuilders are needed (one per device)
-// OR it must be able to distinguish events from different devices
+func NewWriter() *Writer {
+	return &Writer{
+		discard: true,
+	}
+}
 
+func (w *Writer) Write(buf []byte) (int, error) {
+	if w.discard {
+		return io.Discard.Write(buf)
+	}
+	return w.Writer.Write(buf)
+}
+
+func (w *Writer) Flush() {
+	discard := w.discard
+	w.discard = true
+	if !discard {
+		w.Flush()
+		w.file.Close()
+	}
+}
+
+func (w *Writer) Persist(filename string) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Error("Error while creating file: %s", filename)
+		return err
+	}
+	w.Writer = bufio.NewWriter(file)
+	w.discard = false
+	return nil
+}
+
+// This is trivial implementation of the event builder which assumes that
+// all fragments come from the same ADC board. This means we need to create
+// multiple event builders, one per ADC board.
 type EventBuilder struct {
 	DeviceSerial uint32
 	EventNum uint32
@@ -40,31 +83,16 @@ type EventBuilder struct {
 	Data map[layers.ChannelNum]*layers.MStreamData
 	Length uint32
 
-	writer *bufio.Writer
-	file *os.File
+	writer *Writer
 }
 
-func NewEventBuilder(deviceSerial uint32, fileSuffix string) (*EventBuilder, error) {
-
-	filename := fmt.Sprintf("%08x_%s.data", deviceSerial, fileSuffix)
-	file, err := os.Create(filename)
-	if err != nil {
-		log.Error("Error while creating file: %s", filename)
-		return nil, err
-	}
-	writer := bufio.NewWriter(file)
-
+// NewEventBuilder ...
+func NewEventBuilder(writer *Writer) (*EventBuilder, error) {
 	builder := &EventBuilder{
-		file: file,
 		writer: writer,
 	}
 	builder.Clear()
 	return builder, nil
-}
-
-func (eb *EventBuilder) Close() {
-	eb.writer.Flush()
-	eb.file.Close()
 }
 
 func (eb *EventBuilder) Clear() {
@@ -110,7 +138,7 @@ func (eb *EventBuilder) CloseEvent() error {
 		MpdTimestampHeader: &layers.MpdTimestampHeader{
 			Sync: layers.MpdTimestampMagic,
 			Length: 8,
-			Timestamp: Now(),
+			Timestamp: srv.Now(),
 		},
 		MpdEventHeader: &layers.MpdEventHeader{
 			Sync: layers.MpdSyncMagic,
@@ -179,28 +207,72 @@ func (eb *EventBuilder) SetFragment(f *layers.MStreamFragment) {
 }
 
 type EventHandler struct {
+	sync.RWMutex
 	eventBuilders map[uint32]*EventBuilder
-	fileSuffix string
+	persistTimestamp string
+	persistDir string
+	persistFilePrefix string
+	persist bool
 }
 
-func NewEventHandler(fileSuffix string) *EventHandler {
+func NewEventHandler() *EventHandler {
 	return &EventHandler{
 		eventBuilders: make(map[uint32]*EventBuilder),
-		fileSuffix: fileSuffix,
+		persist: false,
 	}
 }
 
-func (eh *EventHandler) Close() {
+func (eh *EventHandler) Flush() {
+	log.Info("Flush data files")
+	eh.persist = false
+	eh.Lock()
+	defer eh.Unlock()
 	for _, eb := range eh.eventBuilders {
-		eb.Close()
+		eb.writer.Flush()
+		eb.Clear()
 	}
+}
+
+func (eh *EventHandler) persistFilename(deviceSerial uint32) string {
+	filename := fmt.Sprintf("%08x_%s.data", deviceSerial, eh.persistTimestamp)
+	if eh.persistFilePrefix != "" {
+		filename = fmt.Sprintf("%s_%s", eh.persistFilePrefix, filename)
+	}
+	return path.Join(eh.persistDir, filename)
+}
+
+func (eh *EventHandler) Persist(dir, filePrefix string) error {
+	eh.persist = true
+	eh.persistTimestamp = time.Now().UTC().Format("20060102_150405")
+	eh.persistDir = dir
+	eh.persistFilePrefix = filePrefix
+	log.Info("Persist data to files: timestamp: %s dir: %s prefix: %s", eh.persistTimestamp, dir, filePrefix)
+	eh.Lock()
+	defer eh.Unlock()
+	for deviceSerial, eb := range eh.eventBuilders {
+		filename := eh.persistFilename(deviceSerial)
+		log.Info("Persist: device: %08x file: %s", deviceSerial, filename)
+		err := eb.writer.Persist(filename)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (eh *EventHandler) SetFragment(f *layers.MStreamFragment) error {
+	eh.Lock()
+	defer eh.Unlock()
 	deviceSerial := f.MStreamPayloadHeader.DeviceSerial
 	_, ok := eh.eventBuilders[deviceSerial]
 	if !ok {
-		eventBuilder, err := NewEventBuilder(deviceSerial, eh.fileSuffix)
+		writer := NewWriter()
+		if eh.persist {
+			filename := eh.persistFilename(deviceSerial)
+			log.Info("Persist: device: %08x file: %s", deviceSerial, filename)
+			writer.Persist(filename)
+		}
+		eventBuilder, err := NewEventBuilder(writer)
 		if err != nil {
 			log.Error("Error while creating event builder: device: %04x", deviceSerial)
 			return err

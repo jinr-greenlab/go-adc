@@ -49,7 +49,7 @@ var _ ifc.ControlServer = &ControlServer{}
 
 // NewControlServer ...
 func NewControlServer(ctx context.Context, cfg *config.Config) (ifc.ControlServer, error) {
-	log.Debug("Initializing control server with address: %s port: %d", cfg.IP, RegPort)
+	log.Info("Initializing control server with address: %s port: %d", cfg.IP, RegPort)
 
 	uaddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", cfg.IP, RegPort))
 	if err != nil {

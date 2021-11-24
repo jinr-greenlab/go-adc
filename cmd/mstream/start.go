@@ -15,12 +15,13 @@
 package mstream
 
 import (
+	"context"
 	"fmt"
 	"github.com/spf13/cobra"
 	"net"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
-	"jinr.ru/greenlab/go-adc/pkg/srv"
+	"jinr.ru/greenlab/go-adc/pkg/srv/mstream"
 )
 
 const (
@@ -39,7 +40,8 @@ func NewStartCommand() *cobra.Command {
 				parsedIP := net.ParseIP(ip)
 				cfg.IP = &parsedIP
 			}
-			server, err := srv.NewMStreamServer(cfg)
+			ctx := context.Background()
+			server, err := mstream.NewMStreamServer(ctx, cfg)
 			if err != nil {
 				return err
 			}

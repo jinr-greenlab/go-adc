@@ -26,3 +26,5 @@ RUN echo 'source /etc/bash_completion' >> /etc/bash.bashrc \
   && echo 'source <(go-adc completion)' >> /etc/bash.bashrc
 
 COPY --from=builder /src/bin/go-adc /usr/local/bin/go-adc
+
+WORKDIR /data

@@ -49,7 +49,7 @@ type DiscoverServer struct {
 }
 
 func NewDiscoverServer(ctx context.Context, cfg *config.Config) (*DiscoverServer, error) {
-	log.Debug("Initializing discover server with address: %s port: %d iface: %s",
+	log.Info("Initializing discover server with address: %s port: %d iface: %s",
 		cfg.DiscoverIP, DiscoverPort, cfg.DiscoverIface)
 
 	iface, err := net.InterfaceByName(cfg.DiscoverIface)

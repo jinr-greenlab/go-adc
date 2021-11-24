@@ -21,11 +21,13 @@ import (
 	"jinr.ru/greenlab/go-adc/pkg/command/ifc"
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/srv/control"
+	"jinr.ru/greenlab/go-adc/pkg/srv/mstream"
 )
 
 type ApiClient struct {
 	*config.Config
 	ApiPrefix string
+	MStreamApiPrefix string
 }
 
 var _ ifc.ApiClient = &ApiClient{}
@@ -34,6 +36,7 @@ func NewApiClient(cfg *config.Config) ifc.ApiClient {
 	return &ApiClient{
 		Config: cfg,
 		ApiPrefix: fmt.Sprintf("http://%s:%d/api", cfg.IP, control.ApiPort),
+		MStreamApiPrefix: fmt.Sprintf("http://%s:%d/api", cfg.IP, mstream.ApiPort),
 	}
 }
 
@@ -142,6 +145,34 @@ func (c *ApiClient) MStreamStartAll() error {
 // MStreamStop sends request to stop streaming for all devices
 func (c *ApiClient) MStreamStopAll() error {
 	r, err := req.Get(fmt.Sprintf("%s/mstream/stop", c.ApiPrefix))
+	if err != nil {
+		return err
+	}
+	if r.Response().StatusCode != 200 {
+		return errors.New(r.Response().Status)
+	}
+	return nil
+}
+
+// MStreamPersist ...
+func (c *ApiClient) MStreamPersist(dirPath, filePrefix string) error {
+	persist := &mstream.Persist{
+		Dir: dirPath,
+		FilePrefix: filePrefix,
+	}
+	r, err := req.Post(fmt.Sprintf("%s/persist", c.MStreamApiPrefix), req.BodyJSON(persist))
+	if err != nil {
+		return err
+	}
+	if r.Response().StatusCode != 200 {
+		return errors.New(r.Response().Status)
+	}
+	return nil
+}
+
+// MStreamPersist ...
+func (c *ApiClient) MStreamFlush() error {
+	r, err := req.Get(fmt.Sprintf("%s/flush", c.MStreamApiPrefix))
 	if err != nil {
 		return err
 	}

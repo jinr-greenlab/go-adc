@@ -22,4 +22,6 @@ type ApiClient interface {
 	MStreamStop(device string) error
 	MStreamStartAll() error
 	MStreamStopAll() error
+	MStreamPersist(dir, filePrefix string) error
+	MStreamFlush() error
 }

@@ -15,17 +15,23 @@
 package mstream
 
 import (
+	"fmt"
 	"github.com/spf13/cobra"
+	"jinr.ru/greenlab/go-adc/pkg/command"
+	"jinr.ru/greenlab/go-adc/pkg/config"
 )
 
-func NewCommand() *cobra.Command {
+func NewFlushCommand() *cobra.Command {
+	cfg := config.NewDefaultConfig()
+	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "mstream",
-		Short:         "MStream subcommand",
+		Use:    fmt.Sprintf("flush"),
+		Short:  "Discard data to file",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			apiClient := command.NewApiClient(cfg)
+			return apiClient.MStreamFlush()
+		},
 	}
 
-	cmd.AddCommand(NewStartCommand())
-	cmd.AddCommand(NewPersistCommand())
-	cmd.AddCommand(NewFlushCommand())
 	return cmd
 }

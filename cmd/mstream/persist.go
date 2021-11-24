@@ -15,17 +15,28 @@
 package mstream
 
 import (
+	"fmt"
 	"github.com/spf13/cobra"
+	"jinr.ru/greenlab/go-adc/pkg/command"
+	"jinr.ru/greenlab/go-adc/pkg/config"
 )
 
-func NewCommand() *cobra.Command {
+func NewPersistCommand() *cobra.Command {
+	var filePrefix string
+	var dir string
+	cfg := config.NewDefaultConfig()
+	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "mstream",
-		Short:         "MStream subcommand",
+		Use:    fmt.Sprintf("persist"),
+		Short:  "Persist data to file",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			apiClient := command.NewApiClient(cfg)
+			return apiClient.MStreamPersist(dir, filePrefix)
+		},
 	}
 
-	cmd.AddCommand(NewStartCommand())
-	cmd.AddCommand(NewPersistCommand())
-	cmd.AddCommand(NewFlushCommand())
+	cmd.Flags().StringVar(&dir, "dir", "", "Directory path where to persist data")
+	cmd.Flags().StringVar(&filePrefix, "file-prefix", "", "File name prefix")
+
 	return cmd
 }
