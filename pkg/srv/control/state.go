@@ -42,7 +42,7 @@ var _ ifc.State = &State{}
 
 func NewState(ctx context.Context, cfg *config.Config) (ifc.State, error) {
 	// open register database
-	db, err := bbolt.Open(cfg.DBPath, 0600, nil)
+	db, err := bbolt.Open(cfg.DBPath(), 0600, nil)
 	if err != nil {
 		return nil, err
 	}

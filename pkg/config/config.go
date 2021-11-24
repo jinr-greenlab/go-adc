@@ -32,17 +32,15 @@ type Device struct {
 type Config struct {
 	DiscoverIP *net.IP `json:"discoverIP,omitempty"`
 	DiscoverIface string `json:"discoverIface,omitempty"`
-	DiscoverDBPath string `json:"discoverDBPath,omitempty"`
 	IP *net.IP `json:"ip,omitempty"`
 	Devices []*Device `json:"devices"`
-	DBPath string `json:"dbpath,omitempty"`
-	filepath string
+	dirpath string
 }
 
 // Persist serialized the config and saves it to the config file
 func (c *Config) Persist(overwrite bool) error {
-	if _, err := os.Stat(c.filepath); err == nil && !overwrite {
-		return ErrConfigFileExists{Path: c.filepath}
+	if _, err := os.Stat(c.ConfigPath()); err == nil && !overwrite {
+		return ErrConfigFileExists{Path: c.ConfigPath()}
 	}
 
 	data, err := yaml.Marshal(&c)
@@ -50,25 +48,24 @@ func (c *Config) Persist(overwrite bool) error {
 		return err
 	}
 
-	dir := filepath.Dir(c.filepath)
-	err = os.MkdirAll(dir, 0755)
+	err = os.MkdirAll(c.dirpath, 0755)
 	if err != nil {
 		return err
 	}
 
-	err = ioutil.WriteFile(c.filepath, data, 0644)
+	err = ioutil.WriteFile(c.ConfigPath(), data, 0644)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(os.Stdout, "Config is saved into file: %s\n", c.filepath)
+	fmt.Fprintf(os.Stdout, "Config is saved into file: %s\n", c.ConfigPath())
 
 	return nil
 }
 
 // Load reads config file and returns the unmarshalled config structure
 func (c *Config) Load() error {
-	data, err := ioutil.ReadFile(c.filepath)
+	data, err := ioutil.ReadFile(c.ConfigPath())
 	if err != nil {
 		return err
 	}
@@ -95,28 +92,24 @@ func (c *Config) GetDeviceByIP(ip net.IP) (*Device, error) {
 	return nil, errors.New(fmt.Sprintf("Device not found: %s", ip.String()))
 }
 
-func DefaultConfigPath() string {
+func DefaultConfigDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = ""
 	}
-	return filepath.Join(home, ConfigDir, ConfigFile)
+	return filepath.Join(home, ConfigDir)
 }
 
-func DefaultDBPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = ""
-	}
-	return filepath.Join(home, ConfigDir, DBFile)
+func (c *Config) ConfigPath() string {
+	return filepath.Join(c.dirpath, ConfigFile)
 }
 
-func DefaultDiscoverDBPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = ""
-	}
-	return filepath.Join(home, ConfigDir, DiscoverDBFile)
+func (c *Config) DBPath() string {
+	return filepath.Join(c.dirpath, DBFile)
+}
+
+func (c *Config) DiscoverDBPath() string {
+	return filepath.Join(c.dirpath, DiscoverDBFile)
 }
 
 func NewDefaultConfig() *Config {
@@ -128,9 +121,7 @@ func NewDefaultConfig() *Config {
 		DiscoverIface: DefaultDiscoverIface,
 		IP: &ip,
 		Devices: []*Device{},
-		DBPath: DefaultDBPath(),
-		DiscoverDBPath: DefaultDiscoverDBPath(),
-		filepath: DefaultConfigPath(),
+		dirpath: DefaultConfigDir(),
 	}
 }
 

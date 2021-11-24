@@ -40,7 +40,7 @@ type State struct {
 
 func NewState(ctx context.Context, cfg *config.Config) (*State, error) {
 	// open discover database
-	db, err := bbolt.Open(cfg.DiscoverDBPath, 0600, nil)
+	db, err := bbolt.Open(cfg.DiscoverDBPath(), 0600, nil)
 	if err != nil {
 		return nil, err
 	}

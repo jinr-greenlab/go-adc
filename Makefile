@@ -1,6 +1,4 @@
-.PHONY: all build docker_build
-
-all: build
+.PHONY: build docker-build
 
 build:
 	mkdir -p bin
@@ -11,7 +9,7 @@ DOCKER_IMAGE := quay.io/kozhukalov/go-adc
 TIMESTAMP ?= $(shell date +%Y%m%d%H%M%S)
 COMMIT    ?= $(shell git rev-parse HEAD)
 
-docker_build:
+docker-build:
 	docker build --rm -t go-adc:latest .
 	docker tag go-adc:latest ${DOCKER_IMAGE}:latest
 	docker tag go-adc:latest ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
