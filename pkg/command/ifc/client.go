@@ -14,6 +14,8 @@
 
 package ifc
 
+import "jinr.ru/greenlab/go-adc/pkg/layers"
+
 type ApiClient interface {
 	RegRead(device, addr string) (string, error)
 	RegReadAll(device string) (map[string]string, error)
@@ -24,4 +26,5 @@ type ApiClient interface {
 	MStreamStopAll() error
 	MStreamPersist(dir, filePrefix string) error
 	MStreamFlush() error
+	ListDevices() ([]*layers.DeviceDescription, error)
 }

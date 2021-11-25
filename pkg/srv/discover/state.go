@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"go.etcd.io/bbolt"
-	"os"
 	"sigs.k8s.io/yaml"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
@@ -136,16 +135,11 @@ func (s *State) GetAllDeviceDescriptions() ([]*layers.DeviceDescription, error) 
 			if ddBytes == nil {
 				return errors.New(fmt.Sprintf("Description not found", ))
 			}
-			fmt.Fprintf(os.Stderr, "bytes\n")
-			fmt.Fprintf(os.Stderr, string(ddBytes))
 			dd := &layers.DeviceDescription{}
 			if err := yaml.Unmarshal(ddBytes, dd); err != nil {
 				log.Error("Error while unmarshalling DeviceDescription %s\n", err)
 				return err
 			}
-			fmt.Fprintf(os.Stderr, "unmarshalled\n")
-
-			fmt.Fprintf(os.Stderr, dd.String())
 			devices = append(devices, dd)
 			return nil
 		})

@@ -20,14 +20,17 @@ import (
 	"github.com/imroc/req"
 	"jinr.ru/greenlab/go-adc/pkg/command/ifc"
 	"jinr.ru/greenlab/go-adc/pkg/config"
+	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/srv/control"
 	"jinr.ru/greenlab/go-adc/pkg/srv/mstream"
+	"jinr.ru/greenlab/go-adc/pkg/srv/discover"
 )
 
 type ApiClient struct {
 	*config.Config
 	ApiPrefix string
 	MStreamApiPrefix string
+	DiscoverApiPrefix string
 }
 
 var _ ifc.ApiClient = &ApiClient{}
@@ -37,6 +40,7 @@ func NewApiClient(cfg *config.Config) ifc.ApiClient {
 		Config: cfg,
 		ApiPrefix: fmt.Sprintf("http://%s:%d/api", cfg.IP, control.ApiPort),
 		MStreamApiPrefix: fmt.Sprintf("http://%s:%d/api", cfg.IP, mstream.ApiPort),
+		DiscoverApiPrefix: fmt.Sprintf("http://%s:%d/api", cfg.IP, discover.ApiPort),
 	}
 }
 
@@ -180,4 +184,21 @@ func (c *ApiClient) MStreamFlush() error {
 		return errors.New(r.Response().Status)
 	}
 	return nil
+}
+
+// MStreamPersist ...
+func (c *ApiClient) ListDevices() ([]*layers.DeviceDescription, error) {
+	var devices []*layers.DeviceDescription
+	r, err := req.Get(fmt.Sprintf("%s/devices", c.DiscoverApiPrefix))
+	if err != nil {
+		return nil, err
+	}
+	if r.Response().StatusCode != 200 {
+		return nil, errors.New(r.Response().Status)
+	}
+	err = r.ToJSON(&devices)
+	if err != nil {
+		return nil, err
+	}
+	return devices, nil
 }
