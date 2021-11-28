@@ -25,7 +25,7 @@ func NewCommand() *cobra.Command {
 	}
 
 	cmd.AddCommand(NewStartCommand())
-	cmd.AddCommand(NewPersistCommand())
-	cmd.AddCommand(NewFlushCommand())
+	//cmd.AddCommand(NewPersistCommand())
+	//cmd.AddCommand(NewFlushCommand())
 	return cmd
 }

@@ -24,6 +24,8 @@ import (
 
 func NewMStreamCommand() *cobra.Command {
 	var device string
+	var filePrefix string
+	var dir string
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
@@ -35,11 +37,19 @@ func NewMStreamCommand() *cobra.Command {
 			apiClient := command.NewApiClient(cfg)
 			switch args[0] {
 			case "start":
+				err := apiClient.MStreamPersist(dir, filePrefix)
+				if err != nil {
+					return err
+				}
 				if device != "" {
 					return apiClient.MStreamStart(device)
 				}
 				return apiClient.MStreamStartAll()
 			case "stop":
+				err := apiClient.MStreamFlush()
+				if err != nil {
+					return err
+				}
 				if device != "" {
 					return apiClient.MStreamStop(device)
 				}
@@ -50,6 +60,8 @@ func NewMStreamCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&device, DeviceOptionName, "", "Device name")
+	cmd.Flags().StringVar(&dir, "dir", "", "Directory path where to persist data")
+	cmd.Flags().StringVar(&filePrefix, "file-prefix", "", "File name prefix")
 
 	return cmd
 }
