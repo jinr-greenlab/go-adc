@@ -37,7 +37,11 @@ func NewMStreamCommand() *cobra.Command {
 			apiClient := command.NewApiClient(cfg)
 			switch args[0] {
 			case "start":
-				err := apiClient.MStreamPersist(dir, filePrefix)
+				err := apiClient.MStreamConnectToDevices()
+				if err != nil {
+					return err
+				}
+				err = apiClient.MStreamPersist(dir, filePrefix)
 				if err != nil {
 					return err
 				}

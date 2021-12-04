@@ -22,8 +22,8 @@ import (
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/srv/control"
-	"jinr.ru/greenlab/go-adc/pkg/srv/mstream"
 	"jinr.ru/greenlab/go-adc/pkg/srv/discover"
+	"jinr.ru/greenlab/go-adc/pkg/srv/mstream"
 )
 
 type ApiClient struct {
@@ -201,4 +201,16 @@ func (c *ApiClient) ListDevices() ([]*layers.DeviceDescription, error) {
 		return nil, err
 	}
 	return devices, nil
+}
+
+// MStreamConnectToDevices ...
+func (c *ApiClient) MStreamConnectToDevices() error {
+	r, err := req.Get(fmt.Sprintf("%s/connect_to_devices", c.MStreamApiPrefix))
+	if err != nil {
+		return err
+	}
+	if r.Response().StatusCode != 200 {
+		return errors.New(r.Response().Status)
+	}
+	return nil
 }

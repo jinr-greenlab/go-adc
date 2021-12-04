@@ -68,6 +68,7 @@ func (s *ApiServer) configureRouter() {
 	subRouter := s.Router.PathPrefix("/api").Subrouter()
 	subRouter.HandleFunc("/persist", s.handlePersist()).Methods("POST")
 	subRouter.HandleFunc("/flush", s.handleFlush()).Methods("GET")
+	subRouter.HandleFunc("/connect_to_devices", s.handleConnectToDevices()).Methods("GET")
 }
 
 func (s *ApiServer) handlePersist() http.HandlerFunc {
@@ -93,5 +94,15 @@ func (s *ApiServer) handleFlush() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Debug("Handling flush request")
 		s.mstream.EventHandler.Flush()
+	}
+}
+
+func (s *ApiServer) handleConnectToDevices() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Debug("Handling connect to devices request")
+		err := s.mstream.ConnectToDevices()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+		}
 	}
 }

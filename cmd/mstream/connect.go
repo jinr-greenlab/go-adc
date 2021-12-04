@@ -12,20 +12,26 @@
  limitations under the License.
 */
 
-package ifc
+package mstream
 
-import "jinr.ru/greenlab/go-adc/pkg/layers"
+import (
+	"fmt"
+	"github.com/spf13/cobra"
+	"jinr.ru/greenlab/go-adc/pkg/command"
+	"jinr.ru/greenlab/go-adc/pkg/config"
+)
 
-type ApiClient interface {
-	RegRead(device, addr string) (string, error)
-	RegReadAll(device string) (map[string]string, error)
-	RegWrite(device, addr, value string) error
-	MStreamStart(device string) error
-	MStreamStop(device string) error
-	MStreamStartAll() error
-	MStreamStopAll() error
-	MStreamPersist(dir, filePrefix string) error
-	MStreamFlush() error
-	ListDevices() ([]*layers.DeviceDescription, error)
-	MStreamConnectToDevices() error
+func NewConnectCommand() *cobra.Command {
+	cfg := config.NewDefaultConfig()
+	cfg.Load()
+	cmd := &cobra.Command{
+		Use:    fmt.Sprintf("connect"),
+		Short:  "Connect to devices",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			apiClient := command.NewApiClient(cfg)
+			return apiClient.MStreamConnectToDevices()
+		},
+	}
+
+	return cmd
 }

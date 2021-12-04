@@ -26,7 +26,7 @@ func NewFlushCommand() *cobra.Command {
 	cfg.Load()
 	cmd := &cobra.Command{
 		Use:    fmt.Sprintf("flush"),
-		Short:  "Discard data to file",
+		Short:  "Discard data file",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			apiClient := command.NewApiClient(cfg)
 			return apiClient.MStreamFlush()
