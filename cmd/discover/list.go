@@ -38,7 +38,7 @@ func NewListCommand() *cobra.Command {
 				fmt.Printf(device.String())
 				now := uint64(time.Now().UnixNano()) * uint64(time.Nanosecond) / uint64(time.Millisecond)
 				if now - device.Timestamp > 3000 {
-					fmt.Printf("!!! Device is offline")
+					fmt.Printf("~~~ Device is offline ~~~\n")
 				}
 			}
 			return nil

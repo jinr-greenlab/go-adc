@@ -31,170 +31,201 @@ const (
  http://www.sans.org/reading-room/whitepapers/detection/ip-fragment-reassembly-scapy-33969
 */
 
-// fragmentList holds a list used to contain MStream framgments.
+// acceptedRange = 2*(hwBufSize-1) * FRAGMENTS_IN_PACKAGE_2_2;
+
+
+// FragmentBuilder holds a linked list which is used to store MStream fragment parts.
 // It stores internal counters/flags to track the state of the MStream flow.
-type fragmentList struct {
-	List                 list.List
-	Highest              uint16
-	TotalLength          uint16
-	LastFragmentReceived bool
+type FragmentBuilder struct {
+	FragmentID             uint16
+	DeviceID               uint8
+	Flags                  uint8
+	Subtype
+	Free                   bool
+	Parts                  *list.List
+	Highest                uint16
+	TotalLength            uint16
+	LastFragmentReceived   bool
+	Completed              bool
+	closeCh                chan<- *MStreamFragment
+	mgr                    *FragmentBuilderManager
 }
 
-// insert inserts MStream fragment into the fragment list
-func (fl *fragmentList) insert(f *MStreamFragment) (*MStreamFragment, error) {
+func NewFragmentBuilder(mgr *FragmentBuilderManager, fragmentId uint16, closeCh chan<- *MStreamFragment) *FragmentBuilder {
+	return &FragmentBuilder{
+		mgr: mgr,
+		FragmentID: fragmentId,
+		DeviceID: 0,
+		Flags: 0,
+		Subtype: 0,
+		Free: true,
+		Parts: list.New(),
+		Highest: 0,
+		TotalLength: 0,
+		LastFragmentReceived: false,
+		Completed: false,
+		closeCh: closeCh,
+	}
+}
 
-	if f.FragmentOffset >= fl.Highest {
-		fl.List.PushBack(f)
+func (b *FragmentBuilder) Clear() {
+	//log.Info("Clear fragment builder: %s %d", b.mgr.deviceName, b.FragmentID)
+	b.Free = true
+	b.DeviceID = 0
+	b.Flags = 0
+	b.Subtype = 0
+	b.Parts = list.New()
+	b.Highest = 0
+	b.TotalLength = 0
+	b.LastFragmentReceived = false
+	b.Completed = false
+}
+
+
+func (b *FragmentBuilder) CloseFragment() {
+	//log.Info("Close fragment: %s %d", b.mgr.deviceName, b.FragmentID)
+	defer b.Clear()
+
+	var data []byte
+	var currentOffset uint16
+
+	for e := b.Parts.Front(); e != nil; e = e.Next() {
+		// we don't check the error here since the list contains only MStream fragments
+		f, _ := e.Value.(*MStreamFragment)
+		if f.FragmentOffset == currentOffset { // First fragment must have offset = 0
+			log.Debug("CloseFragment: %s fragment: %d offset: %d",
+				b.mgr.deviceName, b.FragmentID, f.FragmentOffset)
+			data = append(data, f.Data...)
+			currentOffset += f.FragmentLength
+		} else {
+			log.Error("Overlapping fragment or hole found: %s fragment: %d",
+				b.mgr.deviceName, b.FragmentID)
+			return
+		}
+	}
+
+	assembled := &MStreamFragment{
+		DeviceID: b.DeviceID,
+		Flags:    b.Flags,
+		Subtype:  b.Subtype,
+		FragmentLength: b.Highest,
+		FragmentID: b.FragmentID,
+		FragmentOffset: 0,
+		Data: data,
+	}
+	assembled.SetLastFragment(true)
+	err := assembled.DecodePayload()
+	if err != nil {
+		log.Error("Error while decoding fragment payload: " +
+			"%s %d error: %s", b.mgr.deviceName, b.FragmentID, err)
+		return
+	}
+
+	b.closeCh <- assembled
+	b.mgr.SetLastClosedFragment(b.FragmentID)
+}
+
+
+func (b *FragmentBuilder) SetFragment(f *MStreamFragment) {
+	if b.Free {
+		b.Free = false
+		b.DeviceID = f.DeviceID
+		b.Flags = f.Flags
+		b.Subtype = f.Subtype
+	}
+
+	if f.FragmentOffset >= b.Highest {
+		b.Parts.PushBack(f)
 	} else {
-		for e := fl.List.Front(); e != nil; e = e.Next() {
+		for e := b.Parts.Front(); e != nil; e = e.Next() {
 			// we don't check the error here the list contains only MStream fragments
 			frag, _ := e.Value.(*MStreamFragment)
 
 			if f.FragmentOffset == frag.FragmentOffset {
-				log.Debug("defrag: insert: ignoring fragment %d as we already have it (duplicate?)",
-					f.FragmentOffset)
-				return nil, nil
+				log.Debug("Fragment duplication: %s %d",
+					b.mgr.deviceName, b.FragmentID)
+				return
 			}
 
 			if f.FragmentOffset < frag.FragmentOffset {
-				log.Debug("defrag: insert: inserting fragment %d before existing fragment %d",
-					f.FragmentOffset, frag.FragmentOffset)
-				fl.List.InsertBefore(f, e)
+				b.Parts.InsertBefore(f, e)
 				break
 			}
 		}
 	}
 
 	// After inserting the fragment, we update the fragment list state
-	if fl.Highest < f.FragmentOffset + f.FragmentLength {
-		fl.Highest = f.FragmentOffset + f.FragmentLength
+	if b.Highest < f.FragmentOffset + f.FragmentLength {
+		b.Highest = f.FragmentOffset + f.FragmentLength
 	}
-	fl.TotalLength += f.FragmentLength
+	b.TotalLength += f.FragmentLength
 
-	log.Debug("defrag: insert: fragment list state: fragments count: %d highest: %d total: %d",
-		fl.List.Len(), fl.Highest, fl.TotalLength)
+	//log.Debug("Fragment builder: %s %d state: count: %d highest: %d total: %d",
+	//	b.mgr.deviceName, b.FragmentID, b.Parts.Len(), b.Highest, b.TotalLength)
 
 	if f.LastFragment() {
-		fl.LastFragmentReceived = true
+		b.LastFragmentReceived = true
 	}
 
 	// Last fragment received and the total length of all fragments corresponds
 	// to the end of the last fragment which means there are no missing fragments.
-	if fl.LastFragmentReceived && fl.Highest == fl.TotalLength {
-		return fl.assemble(f)
-	}
-	return nil, nil
-}
-
-// assemble builds MStream layer from its fragments placed in fragment list
-func (fl *fragmentList) assemble(f *MStreamFragment) (*MStreamFragment, error) {
-	var data []byte
-	var currentOffset uint16
-
-	log.Debug("defrag: assemble: assembling the MStream frame from fragments")
-
-	for e := fl.List.Front(); e != nil; e = e.Next() {
-		// we don't check the error here since the list contains only MStream fragments
-		frag, _ := e.Value.(*MStreamFragment)
-		if frag.FragmentOffset == currentOffset { // First fragment must have offset = 0
-			log.Debug("defrag: assemble: add fragment id: %d offset: %d", frag.FragmentID, frag.FragmentOffset)
-			data = append(data, frag.Data...)
-			currentOffset += frag.FragmentLength
-		} else {
-			// Houston, we have a problem.
-			return nil, ErrMStreamAssemble{ What: "overlapping fragment or hole found while assembling" }
-		}
-		log.Debug("defrag: assemble: next id: %d offset: %d", f.FragmentID, currentOffset)
+	if b.LastFragmentReceived && b.Highest == b.TotalLength {
+		//log.Info("Fragment completed: %s %d", b.mgr.deviceName, b.FragmentID)
+		b.Completed = true
 	}
 
-	assembled := &MStreamFragment{
-		DeviceID: f.DeviceID,
-		Flags:    f.Flags,
-		Subtype:  f.Subtype,
-		FragmentLength: fl.Highest,
-		FragmentID: f.FragmentID,
-		FragmentOffset: 0,
-		Data: data,
-	}
-	assembled.SetLastFragment(true)
-
-	return assembled, nil
-}
-
-// fragmentListKey is used as a map key. It fully identifies the fragmented
-// MStream frame since it contains two MLink endpoints (see gopacket.Flow and gopacket.Endpoint)
-// plus FragmentID which is the same for all fragments within a MStream frame
-// and different for different MStream frames.
-type fragmentListKey struct {
-	Device string
-	FragmentID uint16
-}
-
-func NewFragmentListKey(f *MStreamFragment, device string) fragmentListKey {
-	return fragmentListKey{
-		Device: device,
-		FragmentID: f.FragmentID,
+	if b.Completed && (b.mgr.GetLastClosedFragment() + 1) == b.FragmentID {
+		b.CloseFragment()
 	}
 }
 
-// MStreamDefragmenter is a struct which embeds a map of fragment lists.
-type MStreamDefragmenter struct {
-	sync.RWMutex
-	// Fragments field is an in memory buffer which is used to store
-	// MStream frame fragments as they are received and until we are
-	// able to assemble a whole MStream frame.
-	fragments map[fragmentListKey]*fragmentList
+
+type FragmentBuilderManager struct {
+	mu sync.RWMutex
+	deviceName string
+	// fragmentBuilders field is an in memory buffer which is used to store
+	// MStream fragment parts as they are received and until we are
+	// able to assemble them
+	fragmentBuilders []*FragmentBuilder
+	closeCh chan<- *MStreamFragment
+	lastClosedFragment uint16
 }
 
-// Defrag ...
-func (md *MStreamDefragmenter) Defrag(f *MStreamFragment, device string) (*MStreamFragment, error) {
-	log.Debug("defrag: FragmentID: %d FragmentOffset: %d FragmentLength: %d LastFragment: %t",
-		f.FragmentID, f.FragmentOffset, f.FragmentLength, f.LastFragment())
-
-	key := NewFragmentListKey(f, device)
-
-	var fl *fragmentList
-	md.Lock()
-	fl, ok := md.fragments[key]
-	if !ok {
-		log.Debug("defrag: unknown fragment list key, creating a new one")
-		fl = new(fragmentList)
-		md.fragments[key] = fl
-	}
-	md.Unlock()
-
-	assembled, err := fl.insert(f)
-
-	// TODO: cleanup too old fragment keys with no hope to be assembled
-
-	// drop fragment list if maximum fragment list length is achieved
-	if assembled == nil && fl.List.Len() + 1 > MaxFragmentsListLength {
-		md.flush(key)
-		return nil, ErrMStreamTooManyFragments{Number: MaxFragmentsListLength}
-	}
-
-	// fragments are assembled into whole frame
-	if assembled != nil {
-		md.flush(key)
-		return assembled, nil
-	}
-
-	return nil, err
-}
-
-// flush the fragment list for a particular key
-// Reasons might be different, e.g. maximum number of fragments is achieved
-// or defragmentation is done or timed out
-func (md *MStreamDefragmenter) flush(key fragmentListKey) {
-	md.Lock()
-	delete(md.fragments, key)
-	md.Unlock()
-}
-
-// NewMStreamDefragmenter returns a new MStreamDefragmenter with the initialized map of fragment lists.
-func NewMStreamDefragmenter() *MStreamDefragmenter {
-	return &MStreamDefragmenter{
-		fragments: make(map[fragmentListKey]*fragmentList),
+func NewFragmentBuilderManager(deviceName string, closeCh chan<- *MStreamFragment) *FragmentBuilderManager {
+	log.Info("Creating FragmentBuilderManager: %s", deviceName)
+	return &FragmentBuilderManager{
+		deviceName:       deviceName,
+		fragmentBuilders: make([]*FragmentBuilder, 65536),
+		closeCh:          closeCh,
 	}
 }
+
+func (m *FragmentBuilderManager) Init() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	log.Info("Initializing fragment builder manager: %s", m.deviceName)
+	for i := 0; i < 65536; i++ {
+		m.fragmentBuilders[i] = NewFragmentBuilder(m, uint16(i), m.closeCh)
+	}
+	log.Info("Init last closed fragment to 65535")
+	m.SetLastClosedFragment(65535)
+	log.Info("Done initializing fragment builder manager: %s", m.deviceName)
+}
+
+func (m *FragmentBuilderManager) GetLastClosedFragment() uint16 {
+	return m.lastClosedFragment
+}
+
+func (m *FragmentBuilderManager) SetLastClosedFragment(fragmentID uint16) {
+	//log.Info("Set last closed fragment: %s %d", m.deviceName, fragmentID)
+	m.lastClosedFragment = fragmentID
+}
+
+func (m *FragmentBuilderManager) SetFragment(f *MStreamFragment) {
+	//log.Info("Setting fragment part: %s %d offset: %d length: %d last: %t",
+	//	m.deviceName, f.FragmentID, f.FragmentOffset, f.FragmentLength, f.LastFragment())
+
+	m.fragmentBuilders[f.FragmentID].SetFragment(f)
+}
+
 

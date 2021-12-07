@@ -12,6 +12,6 @@ COMMIT    ?= $(shell git rev-parse HEAD)
 docker-build:
 	docker build --rm -t go-adc:latest .
 	docker tag go-adc:latest ${DOCKER_IMAGE}:latest
-	docker tag go-adc:latest ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
-	@echo docker push ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
+#	docker tag go-adc:latest ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
+#	@echo docker push ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
 	@echo docker push ${DOCKER_IMAGE}:latest

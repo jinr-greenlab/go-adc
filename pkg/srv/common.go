@@ -72,11 +72,9 @@ type Server struct {
 
 // ReadPacketData reads chCaptured channel and returns packet data and metadata.
 // This method is from PacketDataSource interface.
-func (s *Server) ReadPacketData() (data []byte, captureInfo gopacket.CaptureInfo, err error) {
-	packet := <-s.ChIn
-	data = packet.Data
-	captureInfo = packet.CaptureInfo
-	return
+func (s *Server) ReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
+	p := <-s.ChIn
+	return p.Data, p.CaptureInfo, nil
 }
 
 func Now() uint64 {

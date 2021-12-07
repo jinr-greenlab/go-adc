@@ -15,64 +15,22 @@
 package mstream
 
 import (
-	"bufio"
-	"errors"
-	"fmt"
 	"github.com/google/gopacket"
-	"io"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 	"jinr.ru/greenlab/go-adc/pkg/srv"
-	"os"
-	"path"
-	"sync"
-	"time"
 )
 
 const (
-	MaxEventDiff = 10
+	NumEventBuilders = 10
+	BuilderFragmentChSize = 8
 )
 
-type Writer struct {
-	*bufio.Writer
-	file *os.File
-	discard bool
-}
 
-func NewWriter() *Writer {
-	return &Writer{
-		discard: true,
-	}
-}
-
-func (w *Writer) Write(buf []byte) (int, error) {
-	if w.discard {
-		return io.Discard.Write(buf)
-	}
-	return w.Writer.Write(buf)
-}
-
-func (w *Writer) Flush() {
-	discard := w.discard
-	w.discard = true
-	if !discard {
-		w.Flush()
-		w.file.Close()
-	}
-}
-
-func (w *Writer) Persist(filename string) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		log.Error("Error while creating file: %s", filename)
-		return err
-	}
-	w.Writer = bufio.NewWriter(file)
-	w.discard = false
-	return nil
-}
-
-type Event struct {
+type EventBuilder struct {
+	Id int
+	ManagerId string
+	Free bool
 	DeviceSerial uint32
 	EventNum uint32
 	TriggerChannels uint64
@@ -84,22 +42,29 @@ type Event struct {
 	Data map[layers.ChannelNum]*layers.MStreamData
 	Length uint32
 
-	writer *Writer
+	FragmentCh chan *layers.MStreamFragment
+	mpdCh chan<- []byte
+	seq <-chan uint32
 }
 
 // NewEvent ...
-func NewEvent(deviceSerial, eventNum uint32) *Event {
-	return &Event{
-		DeviceSerial: deviceSerial,
-		EventNum: eventNum,
+func NewEventBuilder(id int, managerId string, mpdCh chan<- []byte, seq <-chan uint32) *EventBuilder {
+	return &EventBuilder{
+		Id: id,
+		ManagerId: managerId,
+		Free: true,
+		DeviceSerial: 0,
+		EventNum: 0,
 		TriggerChannels: 0,
 		DataChannels: 0,
 		Trigger: nil,
 		Data: make(map[layers.ChannelNum]*layers.MStreamData),
 		DataSize: 0,
 		Length: 0,
+		FragmentCh: make(chan *layers.MStreamFragment, BuilderFragmentChSize),
+		mpdCh: mpdCh,
+		seq: seq,
 	}
-
 }
 
 func countDataFragments(channels uint64) (count uint32){
@@ -111,17 +76,32 @@ func countDataFragments(channels uint64) (count uint32){
 	return
 }
 
-func (e *Event) Close(writer io.Writer) error {
-	if e.Trigger == nil {
-		return errors.New("Can not close event w/o trigger")
-	}
+func (b *EventBuilder) Clear() {
+	b.Free = true
+	b.EventNum = <- b.seq
+	b.TriggerChannels = 0
+	b.DataChannels = 0
+	b.Trigger = nil
+	b.Data = make(map[layers.ChannelNum]*layers.MStreamData)
+	b.DataSize = 0
+	b.DeviceSerial = 0
+	b.Length = 0
+}
 
-	log.Info("Data    channels: %064b", e.DataChannels)
-	log.Info("Trigger channels: %064b", e.TriggerChannels)
-	dataCount := countDataFragments(e.DataChannels)
+func (b *EventBuilder) CloseEvent() {
+	defer b.Clear()
+
+	if b.Trigger == nil {
+		log.Error("Can not close event w/o trigger")
+		return
+	}
+	//log.Info("Close event: manager: %s builder: %d event: %d\n" +
+	//	"Data    channels: %064b\n" +
+	//	"Trigger channels: %064b", b.ManagerId, b.Id, b.EventNum, b.DataChannels, b.TriggerChannels)
+	dataCount := countDataFragments(b.DataChannels)
 	// Total data length is the total length of all data fragments + total length of all MpdMStreamHeader headers
 	// data length + (num data fragments + one trigger fragment) * MStream header size
-	deviceHeaderLength := e.Length + (dataCount + 1) * 4
+	deviceHeaderLength := b.Length + (dataCount + 1) * 4
 	// + 8 bytes (which is the size of MpdDeviceHeader)
 	eventHeaderLength := deviceHeaderLength + 8
 
@@ -133,198 +113,141 @@ func (e *Event) Close(writer io.Writer) error {
 		},
 		MpdEventHeader: &layers.MpdEventHeader{
 			Sync: layers.MpdSyncMagic,
-			EventNum: e.EventNum,
+			EventNum: b.EventNum,
 			Length: eventHeaderLength,
 		},
 		MpdDeviceHeader: &layers.MpdDeviceHeader{
-			DeviceSerial: e.DeviceSerial,
-			DeviceID: e.DeviceID,
+			DeviceSerial: b.DeviceSerial,
+			DeviceID: b.DeviceID,
 			Length: deviceHeaderLength,
 		},
-		Trigger: e.Trigger,
-		Data: e.Data,
+		Trigger: b.Trigger,
+		Data: b.Data,
 	}
 
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{}
 	err := gopacket.SerializeLayers(buf, opts, mpd)
 	if err != nil {
-		log.Error("Error while serializing Mpd layer")
-		return err
+		log.Error("Error while serializing Mpd layer: device: %08x, event: %s", b.DeviceSerial, b.EventNum)
+		return
 	}
 
-	_, err = writer.Write(buf.Bytes())
-	if err != nil {
-		log.Error("Error while writing event: device: %04x event: %d", e.DeviceSerial, e.EventNum)
-		return err
-	}
-	return nil
+	b.mpdCh <- buf.Bytes()
 }
 
 // SetFragment ...
 // fragment payload must be decoded before calling this function
-func (e *Event) SetFragment(f *layers.MStreamFragment) (bool, error) {
-	if f.MStreamPayloadHeader.DeviceSerial != e.DeviceSerial {
-		return false, errors.New(fmt.Sprintf("Wrong device serial number. Must be: %08x", e.DeviceSerial))
+func (b *EventBuilder) SetFragment(f *layers.MStreamFragment) {
+	if b.Free {
+		b.Free = false
+		b.EventNum = f.MStreamPayloadHeader.EventNum
+		b.DeviceSerial = f.MStreamPayloadHeader.DeviceSerial
 	}
 
-	if f.Subtype == layers.MStreamTriggerSubtype {
-		if f.MStreamPayloadHeader.EventNum != e.EventNum {
-			return false, errors.New(fmt.Sprintf("Wrong event number. Must be: %d", e.EventNum))
-		}
-	}
 	// We substruct 8 bytes from the fragment length because fragment payload has
 	// its own header MStreamPayloadHeader which is not included when we serialize
 	// trigger and data when writing to MPD file.
-	e.Length += uint32(f.FragmentLength - 8)
+	b.Length += uint32(f.FragmentLength - 8)
 
 	if f.Subtype == layers.MStreamTriggerSubtype {
-		e.DeviceID = f.DeviceID
-		e.TriggerChannels = uint64(f.MStreamTrigger.HiCh) << 32 | uint64(f.MStreamTrigger.LowCh)
-		e.Trigger = f.MStreamTrigger
-		if e.DataChannels == e.TriggerChannels {
-			return true, nil
+		b.DeviceID = f.DeviceID
+		b.TriggerChannels = uint64(f.MStreamTrigger.HiCh) << 32 | uint64(f.MStreamTrigger.LowCh)
+		b.Trigger = f.MStreamTrigger
+		if b.DataChannels == b.TriggerChannels {
+			b.CloseEvent()
 		}
 	} else if f.Subtype == layers.MStreamDataSubtype {
-		e.DataChannels |= uint64(1) << f.MStreamPayloadHeader.ChannelNum
-		e.Data[f.MStreamPayloadHeader.ChannelNum] = f.MStreamData
-		if e.Trigger != nil && e.DataChannels == e.TriggerChannels {
-			return true, nil
+		b.DataChannels |= uint64(1) << f.MStreamPayloadHeader.ChannelNum
+		b.Data[f.MStreamPayloadHeader.ChannelNum] = f.MStreamData
+		if b.Trigger != nil && b.DataChannels == b.TriggerChannels {
+			b.CloseEvent()
 		}
 	}
-	return false, nil
 }
 
-
-type eventKey struct {
-	DeviceSerial uint32
-	EventNum uint32
-}
-
-func NewEventKey(deviceSerial, eventNum uint32) eventKey {
-	return eventKey{
-		DeviceSerial: deviceSerial,
-		EventNum: eventNum,
-	}
-}
-
-
-type EventHandler struct {
-	sync.RWMutex
-	writers map[uint32]*Writer
-	events map[eventKey]*Event
-	persist bool
-	persistDir string
-	persistFilePrefix string
-	persistTimestamp string
-
-	maxClosedEvent uint32
-	//nextCloseLog uint32
-	nextFlushOld uint32
-}
-
-func NewEventHandler() *EventHandler {
-	return &EventHandler{
-		writers: make(map[uint32]*Writer),
-		events: make(map[eventKey]*Event),
-		persist: false,
-		maxClosedEvent: 0,
-		nextFlushOld: MaxEventDiff,
-	}
-}
-
-func (eh *EventHandler) Flush() {
-	log.Info("Flush data files")
-	eh.persist = false
-	eh.Lock()
-	defer eh.Unlock()
-	for _, w := range eh.writers {
-		w.Flush()
-	}
-}
-
-func (eh *EventHandler) persistFilename(deviceSerial uint32) string {
-	filename := fmt.Sprintf("%08x_%s.data", deviceSerial, eh.persistTimestamp)
-	if eh.persistFilePrefix != "" {
-		filename = fmt.Sprintf("%s_%s", eh.persistFilePrefix, filename)
-	}
-	return path.Join(eh.persistDir, filename)
-}
-
-func (eh *EventHandler) Persist(dir, filePrefix string) error {
-	eh.Lock()
-	defer eh.Unlock()
-	eh.persist = true
-	eh.persistDir = dir
-	eh.persistFilePrefix = filePrefix
-	eh.persistTimestamp = time.Now().UTC().Format("20060102_150405")
-	log.Info("Persist data to files: dir: %s prefix: %s timestamp: %s", dir, filePrefix, eh.persistTimestamp)
-	for deviceSerial, w := range eh.writers {
-		filename := eh.persistFilename(deviceSerial)
-		log.Info("Persist writer: device: %08x file: %s", deviceSerial, filename)
-		err := w.Persist(filename)
-		if err != nil {
-			return err
+func (b *EventBuilder) Run() {
+	b.EventNum = <- b.seq
+	log.Info("Run EventBuilder: %s builder: %d event: %d", b.ManagerId, b.Id, b.EventNum)
+	for {
+		f := <- b.FragmentCh
+		if f.MStreamPayloadHeader.EventNum >= b.EventNum + NumEventBuilders {
+			//log.Info("Force close event: " +
+			//	"%s %d " +
+			//	"builder event: %d " +
+			//	"fragment event: %d",
+			//	b.ManagerId, b.Id, b.EventNum, f.MStreamPayloadHeader.EventNum)
+			b.CloseEvent()
+			b.EventNum = <- b.seq
+			//log.Info("Change event number: manager: %s builder: %d event: %d", b.ManagerId, b.Id, b.EventNum)
+		}
+		if f.MStreamPayloadHeader.EventNum == b.EventNum {
+			//log.Info("Setting event fragment: %s %d event: %d", b.ManagerId, b.Id, f.MStreamPayloadHeader.EventNum)
+			b.SetFragment(f)
 		}
 	}
-	return nil
 }
 
-func (eh *EventHandler) SetFragment(f *layers.MStreamFragment) error {
-	eh.Lock()
-	defer eh.Unlock()
-	eventKey := NewEventKey(f.MStreamPayloadHeader.DeviceSerial, f.MStreamPayloadHeader.EventNum)
+type EventBuilderManager struct {
+	deviceName string
+	eventBuilders []*EventBuilder
+	writerCh chan<- []byte
+	fragmentCh <-chan *layers.MStreamFragment
+	seq chan uint32
+	exitCh <-chan bool
+}
 
-	// Add writer for a device if it does not exist
-	_, ok := eh.writers[eventKey.DeviceSerial]
-	if !ok {
-		log.Info("Create writer: device: %08x", eventKey.DeviceSerial)
-		writer := NewWriter()
-		if eh.persist {
-			filename := eh.persistFilename(eventKey.DeviceSerial)
-			log.Info("Persist writer: device: %08x file: %s", eventKey.DeviceSerial, filename)
-			writer.Persist(filename)
+func NewEventBuilderManager(
+		deviceName string,
+		fragmentCh <-chan *layers.MStreamFragment,
+		writerCh chan<- []byte,
+		exitCh <-chan bool) *EventBuilderManager {
+	log.Info("Creating EventBuilderManager: %s", deviceName)
+	return &EventBuilderManager{
+		deviceName: deviceName,
+		writerCh: writerCh,
+		fragmentCh: fragmentCh,
+		exitCh: exitCh,
+	}
+}
+
+func (m *EventBuilderManager) Run() {
+	m.seq = make(chan uint32)
+	go func() {
+		eventSeq := uint32(1)
+		for {
+			m.seq <- eventSeq
+			eventSeq++
 		}
-		eh.writers[eventKey.DeviceSerial] = writer
+	}()
+
+	m.eventBuilders = []*EventBuilder{}
+	for i := 0; i < NumEventBuilders; i++ {
+		log.Info("Creating EventBuilder: %s %d", m.deviceName, i)
+		b := NewEventBuilder(i, m.deviceName, m.writerCh, m.seq)
+		m.eventBuilders = append(m.eventBuilders, b)
+		go func() {
+			b.Run()
+		}()
 	}
 
-	// Add event for a pair of (device, event number) if it does not exist
-	_, ok = eh.events[eventKey]
-	if !ok {
-		event := NewEvent(eventKey.DeviceSerial, eventKey.EventNum)
-		eh.events[eventKey] = event
-	}
+	//go func() {
+	//	for {
+	//		f := <- m.fragmentCh
+	//		for _, b := range m.eventBuilders {
+	//			b.FragmentCh <- f
+	//		}
+	//	}
+	//}()
 
-	full, err := eh.events[eventKey].SetFragment(f)
-	if err != nil {
-		return err
-	}
-
-	if full {
-		log.Info("Close event: device %08x event: %d", eventKey.DeviceSerial, eventKey.EventNum)
-		err := eh.events[eventKey].Close(eh.writers[eventKey.DeviceSerial])
-		if err != nil {
-			return err
-		}
-		delete(eh.events, eventKey)
-
-		if eventKey.EventNum > eh.maxClosedEvent {
-			eh.maxClosedEvent = eventKey.EventNum
-		}
-
-		if len(eh.events) > 2 * MaxEventDiff {
-			for key, event := range eh.events {
-				if eh.maxClosedEvent - key.EventNum > MaxEventDiff {
-					log.Info("Flush event: %d", key.EventNum)
-					if event.Trigger != nil {
-						log.Info("Force close event: %d", key.EventNum)
-						event.Close(eh.writers[key.DeviceSerial])
-					}
-					delete(eh.events, key)
-				}
-			}
-			eh.nextFlushOld += MaxEventDiff
+	for {
+		f := <-m.fragmentCh
+		for _, b := range m.eventBuilders {
+			b.FragmentCh <- f
 		}
 	}
-	return nil
+	//select {
+	//case <- m.exitCh:
+	//	return
+	//}
 }

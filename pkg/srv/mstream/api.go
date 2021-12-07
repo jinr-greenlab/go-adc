@@ -81,19 +81,14 @@ func (s *ApiServer) handlePersist() http.HandlerFunc {
 		}
 
 		log.Debug("Handling persist request: filePrefix: %s", persist.FilePrefix)
-
-		err = s.mstream.EventHandler.Persist(persist.Dir, persist.FilePrefix)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
-			return
-		}
+		s.mstream.Persist(persist.Dir, persist.FilePrefix)
 	}
 }
 
 func (s *ApiServer) handleFlush() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Debug("Handling flush request")
-		s.mstream.EventHandler.Flush()
+		s.mstream.Flush()
 	}
 }
 

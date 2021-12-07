@@ -131,8 +131,9 @@ func (s *ControlServer) Run() error {
 				Timestamp: time.Now(),
 				AncillaryData: []interface{}{udpAddr, device.Name},
 			}
-
-			s.ChIn <- srv.InPacket{Data: buffer[:length], CaptureInfo: captureInfo}
+			packet := srv.InPacket{CaptureInfo: captureInfo, Data: make([]byte, length)}
+			copy(packet.Data, buffer[:length])
+			s.ChIn <- packet
 		}
 	}()
 
