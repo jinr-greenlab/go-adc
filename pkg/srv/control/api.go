@@ -12,6 +12,33 @@
  limitations under the License.
 */
 
+// go-adc64 API
+//
+// RESTful APIs to interact with go-adc64 server
+// 
+// Terms Of Service:
+//
+//     Schemes: http
+//     Host: localhost:8003
+//     Version: 1.0.0
+//     Contact: 
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Security:
+//     - api_key:
+//
+//     SecurityDefinitions:
+//     api_key:
+//          type: apiKey
+//          name: KEY
+//          in: header
+//
+// swagger:meta
 package control
 
 import (
@@ -28,9 +55,29 @@ import (
 	"strconv"
 )
 
+
+
 const (
 	ApiPort = 8000
 )
+
+// Success response
+// swagger:response okResp
+type swaggRespOk struct {
+   // in:body
+   Body struct {
+      // HTTP status code 200 - OK
+      Code int `json:"code"`
+   }
+}// Error Bad Request
+// swagger:response badReq
+type swaggReqBadRequest struct {
+   // in:body
+   Body struct {
+      // HTTP status code 400 -  Bad Request
+      Code int `json:"code"`
+   }
+}
 
 // RegHex ...
 type RegHex struct {
