@@ -12,6 +12,33 @@
  limitations under the License.
 */
 
+// go-adc64 API
+//
+// RESTful APIs to interact with go-adc64 server
+// 
+// Terms Of Service:
+//
+//     Schemes: http
+//     Host: localhost:8003
+//     Version: 1.0.0
+//     Contact: 
+//
+//     Consumes:
+//     - application/json
+//
+//     Produces:
+//     - application/json
+//
+//     Security:
+//     - api_key:
+//
+//     SecurityDefinitions:
+//     api_key:
+//          type: apiKey
+//          name: KEY
+//          in: header
+//
+// swagger:meta
 package discover
 
 import (
@@ -57,10 +84,38 @@ func (s *ApiServer) Run() error {
 	return httpServer.ListenAndServe()
 }
 
+// Success response
+// swagger:response okResp
+type RespOk struct {
+   // in:body
+   Body struct {
+      // HTTP status code 200 - OK
+      Code int `json:"code"`
+   }
+}// Error Bad Request
+// swagger:response badReq
+type ReqBadRequest struct {
+   // in:body
+   Body struct {
+      // HTTP status code 400 -  Bad Request
+      Code int `json:"code"`
+   }
+}
+
 func (s *ApiServer) configureRouter() {
 	s.Router = mux.NewRouter()
 	subRouter := s.Router.PathPrefix("/api").Subrouter()
+  // swagger:operation GET /devices devices getDevices
+  // ---
+  // summary: Return a list of discovered devices
+  // description: If the list exists, it will be returned else null will be returned.
+  // responses:
+  //   "200":
+  //     "$ref": "#/responses/okResp"
+  //   "400":
+  //     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/devices", s.handleDevices()).Methods("GET")
+  s.Router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", http.FileServer(http.Dir("./swaggerui/"))))
 }
 
 func (s *ApiServer) handleDevices() http.HandlerFunc {
