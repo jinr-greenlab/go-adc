@@ -58,7 +58,7 @@ const (
 
 // Success response
 // swagger:response okResp
-type swaggRespOk struct {
+type RespOk struct {
    // in:body
    Body struct {
       // HTTP status code 200 - OK
@@ -66,7 +66,7 @@ type swaggRespOk struct {
    }
 }// Error Bad Request
 // swagger:response badReq
-type swaggReqBadRequest struct {
+type ReqBadRequest struct {
    // in:body
    Body struct {
       // HTTP status code 400 -  Bad Request

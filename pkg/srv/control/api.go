@@ -63,7 +63,7 @@ const (
 
 // Success response
 // swagger:response okResp
-type swaggRespOk struct {
+type RespOk struct {
    // in:body
    Body struct {
       // HTTP status code 200 - OK
@@ -71,7 +71,7 @@ type swaggRespOk struct {
    }
 }// Error Bad Request
 // swagger:response badReq
-type swaggReqBadRequest struct {
+type ReqBadRequest struct {
    // in:body
    Body struct {
       // HTTP status code 400 -  Bad Request
@@ -152,10 +152,55 @@ func (s *ApiServer) Run() error {
 func (s *ApiServer) configureRouter() {
 	s.Router = mux.NewRouter()
 	subRouter := s.Router.PathPrefix("/api").Subrouter()
+  // swagger:operation GET /r/device/addr get register
+  // ---
+  // summary: read register
+  // description: --
+  // responses:
+  //   "200":
+  //     "$ref": "#/responses/okResp"
+  //   "400":
+  //     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/reg/r/{device}/{addr:0x[0-9abcdef]{4}}", s.handleRegRead()).Methods("GET")
-	subRouter.HandleFunc("/reg/r/{device}", s.handleRegReadAll()).Methods("GET")
+	// swagger:operation GET /r/device read all registers
+  // ---
+  // summary: write register
+  // description: 
+  // responses:
+  //   "200":
+  //     "$ref": "#/responses/okResp"
+  //   "400":
+  //     "$ref": "#/responses/badReq"
+  subRouter.HandleFunc("/reg/r/{device}", s.handleRegReadAll()).Methods("GET")
+  // swagger:operation POST /w/device/addr write register
+  // ---
+  // summary: write register
+  // description: 
+  // responses:
+  //   "200":
+  //     "$ref": "#/responses/okResp"
+  //   "400":
+  //     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/reg/w/{device}", s.handleRegWrite()).Methods("POST")
+  // swagger:operation GET /mstream/{action:start|stop}/device start/stop
+  // ---
+  // summary: start/stop aquisition for device
+  // description: 
+  // responses:
+  //   "200":mstream/{action:start|stop}/
+  //     "$ref": "#/responses/okResp"
+  //   "400":
+  //     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/mstream/{action:start|stop}/{device}", s.handleMStreamAction()).Methods("GET")
+  // swagger:operation GET /mstream/{action:start|stop}
+  // ---
+  // summary: start/stop aquisition for all devices
+  // description: 
+  // responses:
+  //   "200":
+  //     "$ref": "#/responses/okResp"
+  //   "400":
+  //     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/mstream/{action:start|stop}", s.handleMStreamActionAll()).Methods("GET")
 }
 
