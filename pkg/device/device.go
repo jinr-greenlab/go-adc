@@ -174,14 +174,47 @@ func (d *Device) UpdateReg(reg *layers.Reg) error {
 }
 
 //set Lemo trigger
-func (d *Device) SetLemo() error {
+func (d *Device) SetTrigLemo() error {
   trigger_status, err := d.RegRead(RegMap[RegTrigCtrl])
   if err != nil {
     return err
   }
-  if trigger_status.Value&RegTrigStatusBitLemo == 0 {
+  if trigger_status.Value & RegTrigStatusBitLemo == 0 {
     ops := []*layers.RegOp{
-      {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: trigger_status.Value | RegTrigStatusBitLemo}},
+      val := trigger_status.Value | RegTrigStatusBitLemo
+      {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: val}},
+    }
+    return d.ctrl.RegRequest(ops, d.IP)
+  }
+  return nil
+}
+
+//set trigger timer
+func (d *Device) SetTrigTimer() error {
+  trigger_status, err := d.RegRead(RegMap[RegTrigCtrl])
+  if err != nil {
+    return err
+  }
+  if trigger_status.Value & RegTrigStatusBitTimer == 0 {
+    ops := []*layers.RegOp{
+      val := trigger_status.Value | RegTrigStatusBitTimer
+      {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: val}},
+    }
+    return d.ctrl.RegRequest(ops, d.IP)
+  }
+  return nil
+}
+
+//set trigger threshold
+func (d *Device) SetTrigThreshold() error {
+  trigger_status, err := d.RegRead(RegMap[RegTrigCtrl])
+  if err != nil {
+    return err
+  }
+  if trigger_status.Value & RegTrigStatusBitThreshold == 0 {
+    ops := []*layers.RegOp{
+      val := trigger_status.Value | RegTrigStatusBitThreshold
+      {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: val}},
     }
     return d.ctrl.RegRequest(ops, d.IP)
   }
