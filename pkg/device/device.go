@@ -173,6 +173,21 @@ func (d *Device) UpdateReg(reg *layers.Reg) error {
 	return d.state.SetReg(reg, d.Name)
 }
 
+//set Lemo trigger
+func (d *Device) SetLemo() error {
+  trigger_status, err := d.RegRead(RegMap[RegTrigCtrl])
+  if err != nil {
+    return err
+  }
+  if trigger_status.Value&RegTrigStatusBitLemo == 0 {
+    ops := []*layers.RegOp{
+      {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: trigger_status.Value | RegTrigStatusBitLemo}},
+    }
+    return d.ctrl.RegRequest(ops, d.IP)
+  }
+  return nil
+}
+
 // for details how to start and stop streaming data see DominoDevice::writeSettings()
 
 // MStreamStart ...
@@ -275,3 +290,4 @@ func (d *Device) WriteChCtrl(ch int) error {
 //	}
 //	return nil
 //}
+

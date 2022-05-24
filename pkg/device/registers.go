@@ -179,6 +179,12 @@ const (
 	RegRunStatusBitRunning uint16 = 0x0010
 )
 
+const (
+  RegTrigStatusBitTimer uint16 = 0x001
+  RegTrigStatusBitThreshold uint16 = 0x002
+  RegTrigStatusBitLemo uint16 = 0x004
+)
+
 type MemAlias int
 
 const (
