@@ -20,6 +20,9 @@ type Device interface {
 	MStreamStart() error
 	MStreamStop() error
 
+  SetTrigLemoOn() error
+  SetTrigLemoOff() error
+
 	RegRead(addr uint16) (*layers.Reg, error)
 	RegReadAll() ([]*layers.Reg, error)
 	RegWrite(reg *layers.Reg) error
@@ -27,3 +30,4 @@ type Device interface {
 
 	UpdateReg(reg *layers.Reg) error
 }
+

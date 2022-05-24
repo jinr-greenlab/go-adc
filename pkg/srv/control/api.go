@@ -200,6 +200,7 @@ func (s *ApiServer) configureRouter() {
   //   "400":
   //     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/mstream/{action:start|stop}", s.handleMStreamActionAll()).Methods("GET")
+	subRouter.HandleFunc("/trigger/lemo/{action:on|off}/{device}", s.handleTriggerLemo()).Methods("GET")
 }
 
 func (s *ApiServer) handleRegRead() http.HandlerFunc {
@@ -331,4 +332,35 @@ func (s *ApiServer) handleMStreamActionAll() http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
 	}
+}
+
+func (s *ApiServer) handleTriggerLemo() http.HandlerFunc {
+  return func(w http.ResponseWriter, r *http.Request) {
+    vars := mux.Vars(r)
+    log.Debug("Handling trigger Lemo switching request: device: %s action: %s", vars["device"], vars["action"])
+    device, err := s.ctrl.GetDeviceByName(vars["device"])
+    if err != nil {
+      http.Error(w, err.Error(), http.StatusNotFound)
+      return
+    }
+    switch vars["action"] {
+    case "on":
+      err = device.SetTrigLemoOn()
+      if err != nil {
+        http.Error(w, err.Error(), http.StatusBadGateway)
+        return
+      }
+    case "off":
+      err := device.SetTrigLemoOff()
+      if err != nil {
+        http.Error(w, err.Error(), http.StatusBadGateway)
+        return
+      }
+    default:
+      err := srv.ErrUnknownOperation{
+        What: "Wrong Lemo option. Must be one of on/off",
+      }
+      http.Error(w, err.Error(), http.StatusBadRequest)
+    }
+  }
 }
