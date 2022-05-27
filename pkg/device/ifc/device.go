@@ -20,8 +20,7 @@ type Device interface {
 	MStreamStart() error
 	MStreamStop() error
 
-  SetTrigLemoOn() error
-  SetTrigLemoOff() error
+  SetTrigger(bool, bool, bool) error
 
 	RegRead(addr uint16) (*layers.Reg, error)
 	RegReadAll() ([]*layers.Reg, error)

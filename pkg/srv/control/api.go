@@ -83,6 +83,12 @@ type RegHex struct {
 	Value string // hexadecimal
 }
 
+type TrigSetup struct {
+  Timer bool
+  Ext   bool
+  Thrsh bool
+}
+
 type ApiServer struct {
 	context.Context
 	*config.Config
@@ -200,7 +206,8 @@ func (s *ApiServer) configureRouter() {
   //   "400":
   //     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/mstream/{action:start|stop}", s.handleMStreamActionAll()).Methods("GET")
-	subRouter.HandleFunc("/trigger/lemo/{action:on|off}/{device}", s.handleTriggerLemo()).Methods("GET")
+	//subRouter.HandleFunc("/trigger/setup/{device}", s.handleTrigger()).Methods("POST")
+	subRouter.HandleFunc("/trigger/setup/{device}", s.handleTrigger()).Methods("POST")
 }
 
 func (s *ApiServer) handleRegRead() http.HandlerFunc {
@@ -334,33 +341,27 @@ func (s *ApiServer) handleMStreamActionAll() http.HandlerFunc {
 	}
 }
 
-func (s *ApiServer) handleTriggerLemo() http.HandlerFunc {
+func (s *ApiServer) handleTrigger() http.HandlerFunc {
   return func(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
-    log.Debug("Handling trigger Lemo switching request: device: %s action: %s", vars["device"], vars["action"])
+    setup := &TrigSetup{}
+    err := json.NewDecoder(r.Body).Decode(setup)
+    if err != nil {
+      http.Error(w, err.Error(), http.StatusBadRequest)
+      return
+    }
+
     device, err := s.ctrl.GetDeviceByName(vars["device"])
     if err != nil {
       http.Error(w, err.Error(), http.StatusNotFound)
       return
     }
-    switch vars["action"] {
-    case "on":
-      err = device.SetTrigLemoOn()
-      if err != nil {
-        http.Error(w, err.Error(), http.StatusBadGateway)
-        return
-      }
-    case "off":
-      err := device.SetTrigLemoOff()
-      if err != nil {
-        http.Error(w, err.Error(), http.StatusBadGateway)
-        return
-      }
-    default:
-      err := srv.ErrUnknownOperation{
-        What: "Wrong Lemo option. Must be one of on/off",
-      }
-      http.Error(w, err.Error(), http.StatusBadRequest)
+
+    err = device.SetTrigger(setup.Timer, setup.Ext, setup.Thrsh)
+    if err != nil {
+      http.Error(w, err.Error(), http.StatusBadGateway)
+      return
     }
   }
 }
+

@@ -182,7 +182,7 @@ const (
 const (
   RegTrigStatusBitTimer uint16 = 0x001
   RegTrigStatusBitThreshold uint16 = 0x002
-  RegTrigStatusBitLemo uint16 = 0x004
+  RegTrigStatusBitExternal uint16 = 0x004
 )
 
 type MemAlias int

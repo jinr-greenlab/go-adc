@@ -173,68 +173,27 @@ func (d *Device) UpdateReg(reg *layers.Reg) error {
 	return d.state.SetReg(reg, d.Name)
 }
 
-//set Lemo trigger switch on
-func (d *Device) SetTrigLemoOn() error {
-  trigger_status, err := d.RegRead(RegMap[RegTrigCtrl])
+func (d *Device) SetTrigger(Timer bool, Ext bool, Thrsh bool) error {
+  /*trigger_status, err := d.RegRead(RegMap[RegTrigCtrl])
   if err != nil {
     return err
-  }
-  if trigger_status.Value & RegTrigStatusBitLemo == 0 {
-    val := trigger_status.Value | RegTrigStatusBitLemo
-    ops := []*layers.RegOp{
-      {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: val}},
-    }
-    return d.ctrl.RegRequest(ops, d.IP)
-  }
-  return nil
-}
+  }*/
 
-//set Lemo trigger switch off
-func (d *Device) SetTrigLemoOff() error {
-  trigger_status, err := d.RegRead(RegMap[RegTrigCtrl])
-  if err != nil {
-    return err
-  }
-  if trigger_status.Value & RegTrigStatusBitLemo != 0 {
-    val := trigger_status.Value ^ RegTrigStatusBitLemo
-    ops := []*layers.RegOp{
-      {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: val}},
-    }
-    return d.ctrl.RegRequest(ops, d.IP)
-  }
-  return nil
-}
+  var state uint16 = 0
 
-//set trigger timer
-func (d *Device) SetTrigTimer() error {
-  trigger_status, err := d.RegRead(RegMap[RegTrigCtrl])
-  if err != nil {
-    return err
+  if Timer {
+    state |= RegTrigStatusBitTimer
   }
-  if trigger_status.Value & RegTrigStatusBitTimer == 0 {
-    val := trigger_status.Value | RegTrigStatusBitTimer
-    ops := []*layers.RegOp{
-      {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: val}},
-    }
-    return d.ctrl.RegRequest(ops, d.IP)
+  if Ext {
+    state |= RegTrigStatusBitExternal
   }
-  return nil
-}
-
-//set trigger threshold
-func (d *Device) SetTrigThreshold() error {
-  trigger_status, err := d.RegRead(RegMap[RegTrigCtrl])
-  if err != nil {
-    return err
+  if Thrsh {
+    state |= RegTrigStatusBitThreshold
   }
-  if trigger_status.Value & RegTrigStatusBitThreshold == 0 {
-    val := trigger_status.Value | RegTrigStatusBitThreshold
-    ops := []*layers.RegOp{
-      {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: val}},
-    }
-    return d.ctrl.RegRequest(ops, d.IP)
+  ops := []*layers.RegOp{
+    {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: state}},
   }
-  return nil
+  return d.ctrl.RegRequest(ops, d.IP)
 }
 
 // for details how to start and stop streaming data see DominoDevice::writeSettings()
