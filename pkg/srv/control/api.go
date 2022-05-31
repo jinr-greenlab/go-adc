@@ -51,6 +51,8 @@ import (
 	"jinr.ru/greenlab/go-adc/pkg/log"
 	"jinr.ru/greenlab/go-adc/pkg/srv"
 	"jinr.ru/greenlab/go-adc/pkg/srv/control/ifc"
+   //"jinr.ru/greenlab/go-adc/pkg/device"
+   deviceifc "jinr.ru/greenlab/go-adc/pkg/device/ifc"
 	"net/http"
 	"strconv"
 )
@@ -81,12 +83,6 @@ type ReqBadRequest struct {
 type RegHex struct {
 	Addr string // hexadecimal
 	Value string // hexadecimal
-}
-
-type TrigSetup struct {
-  Timer bool
-  Ext   bool
-  Thrsh bool
 }
 
 type ApiServer struct {
@@ -344,7 +340,7 @@ func (s *ApiServer) handleMStreamActionAll() http.HandlerFunc {
 func (s *ApiServer) handleTrigger() http.HandlerFunc {
   return func(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
-    setup := &TrigSetup{}
+    setup := &deviceifc.TrigSetup{}
     err := json.NewDecoder(r.Body).Decode(setup)
     if err != nil {
       http.Error(w, err.Error(), http.StatusBadRequest)
@@ -357,7 +353,7 @@ func (s *ApiServer) handleTrigger() http.HandlerFunc {
       return
     }
 
-    err = device.SetTrigger(setup.Timer, setup.Ext, setup.Thrsh)
+    err = device.SetTrigger(setup)
     if err != nil {
       http.Error(w, err.Error(), http.StatusBadGateway)
       return

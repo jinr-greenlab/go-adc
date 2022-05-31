@@ -15,12 +15,19 @@
 package ifc
 
 import "jinr.ru/greenlab/go-adc/pkg/layers"
+//import "jinr.ru/greenlab/go-adc/pkg/device"
+
+type TrigSetup struct {
+  Timer bool
+  Threshold bool
+  External bool
+}
 
 type Device interface {
 	MStreamStart() error
 	MStreamStop() error
 
-  SetTrigger(bool, bool, bool) error
+  SetTrigger(setup *TrigSetup) error
 
 	RegRead(addr uint16) (*layers.Reg, error)
 	RegReadAll() ([]*layers.Reg, error)

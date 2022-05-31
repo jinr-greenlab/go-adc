@@ -34,6 +34,12 @@ type FirParams struct {
 	Coef []uint16
 }
 
+/*type TrigSetup struct {
+  Timer bool
+  Threshold bool
+  External bool
+}*/
+
 func NewFirParams() *FirParams {
 	f := &FirParams{
 		Roundoff: FirRoundoffDefault,
@@ -173,7 +179,7 @@ func (d *Device) UpdateReg(reg *layers.Reg) error {
 	return d.state.SetReg(reg, d.Name)
 }
 
-func (d *Device) SetTrigger(Timer bool, Ext bool, Thrsh bool) error {
+func (d *Device) SetTrigger(setup *deviceifc.TrigSetup) error {
   /*trigger_status, err := d.RegRead(RegMap[RegTrigCtrl])
   if err != nil {
     return err
@@ -181,13 +187,13 @@ func (d *Device) SetTrigger(Timer bool, Ext bool, Thrsh bool) error {
 
   var state uint16 = 0
 
-  if Timer {
+  if setup.Timer {
     state |= RegTrigStatusBitTimer
   }
-  if Ext {
+  if setup.External {
     state |= RegTrigStatusBitExternal
   }
-  if Thrsh {
+  if setup.Threshold {
     state |= RegTrigStatusBitThreshold
   }
   ops := []*layers.RegOp{
