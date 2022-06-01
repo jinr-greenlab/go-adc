@@ -34,12 +34,6 @@ type FirParams struct {
 	Coef []uint16
 }
 
-/*type TrigSetup struct {
-  Timer bool
-  Threshold bool
-  External bool
-}*/
-
 func NewFirParams() *FirParams {
 	f := &FirParams{
 		Roundoff: FirRoundoffDefault,
@@ -179,25 +173,59 @@ func (d *Device) UpdateReg(reg *layers.Reg) error {
 	return d.state.SetReg(reg, d.Name)
 }
 
-func (d *Device) SetTrigger(setup *deviceifc.TrigSetup) error {
-  /*trigger_status, err := d.RegRead(RegMap[RegTrigCtrl])
+func (d *Device) SetTriggerTimer(val bool) error {
+  state, err := d.RegRead(RegMap[RegTrigCtrl])
+  reg := state.Value
   if err != nil {
     return err
-  }*/
+  }
 
-  var state uint16 = 0
+  if val {
+    reg |= RegTrigStatusBitTimer
+  } else {
+    reg &= ^RegTrigStatusBitTimer
+  }
 
-  if setup.Timer {
-    state |= RegTrigStatusBitTimer
-  }
-  if setup.External {
-    state |= RegTrigStatusBitExternal
-  }
-  if setup.Threshold {
-    state |= RegTrigStatusBitThreshold
-  }
   ops := []*layers.RegOp{
-    {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: state}},
+    {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: reg}},
+  }
+  return d.ctrl.RegRequest(ops, d.IP)
+}
+
+func (d *Device) SetTriggerThreshold(val bool) error {
+  state, err := d.RegRead(RegMap[RegTrigCtrl])
+  reg := state.Value
+  if err != nil {
+    return err
+  }
+  
+  if val {
+    reg |= RegTrigStatusBitThreshold
+  } else {
+    reg &= ^RegTrigStatusBitThreshold
+  }
+
+  ops := []*layers.RegOp{
+    {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: reg}},
+  }
+  return d.ctrl.RegRequest(ops, d.IP)
+}
+
+func (d *Device) SetTriggerLemo(val bool) error {
+  state, err := d.RegRead(RegMap[RegTrigCtrl])
+  reg := state.Value
+  if err != nil {
+    return err
+  }
+  
+  if val {
+    reg |= RegTrigStatusBitLemo
+  } else {
+    reg &= ^RegTrigStatusBitLemo
+  }
+
+  ops := []*layers.RegOp{
+    {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: reg}},
   }
   return d.ctrl.RegRequest(ops, d.IP)
 }
