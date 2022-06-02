@@ -173,6 +173,63 @@ func (d *Device) UpdateReg(reg *layers.Reg) error {
 	return d.state.SetReg(reg, d.Name)
 }
 
+func (d *Device) SetTriggerTimer(val bool) error {
+  state, err := d.RegRead(RegMap[RegTrigCtrl])
+  reg := state.Value
+  if err != nil {
+    return err
+  }
+
+  if val {
+    reg |= RegTrigStatusBitTimer
+  } else {
+    reg &= ^RegTrigStatusBitTimer
+  }
+
+  ops := []*layers.RegOp{
+    {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: reg}},
+  }
+  return d.ctrl.RegRequest(ops, d.IP)
+}
+
+func (d *Device) SetTriggerThreshold(val bool) error {
+  state, err := d.RegRead(RegMap[RegTrigCtrl])
+  reg := state.Value
+  if err != nil {
+    return err
+  }
+  
+  if val {
+    reg |= RegTrigStatusBitThreshold
+  } else {
+    reg &= ^RegTrigStatusBitThreshold
+  }
+
+  ops := []*layers.RegOp{
+    {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: reg}},
+  }
+  return d.ctrl.RegRequest(ops, d.IP)
+}
+
+func (d *Device) SetTriggerLemo(val bool) error {
+  state, err := d.RegRead(RegMap[RegTrigCtrl])
+  reg := state.Value
+  if err != nil {
+    return err
+  }
+  
+  if val {
+    reg |= RegTrigStatusBitLemo
+  } else {
+    reg &= ^RegTrigStatusBitLemo
+  }
+
+  ops := []*layers.RegOp{
+    {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: reg}},
+  }
+  return d.ctrl.RegRequest(ops, d.IP)
+}
+
 // for details how to start and stop streaming data see DominoDevice::writeSettings()
 
 // MStreamStart ...
@@ -275,3 +332,4 @@ func (d *Device) WriteChCtrl(ch int) error {
 //	}
 //	return nil
 //}
+

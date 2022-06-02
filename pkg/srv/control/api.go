@@ -15,13 +15,13 @@
 // go-adc64 API
 //
 // RESTful APIs to interact with go-adc64 server
-// 
+//
 // Terms Of Service:
 //
 //     Schemes: http
 //     Host: localhost:8003
 //     Version: 1.0.0
-//     Contact: 
+//     Contact:
 //
 //     Consumes:
 //     - application/json
@@ -45,14 +45,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"strconv"
+
 	"github.com/gorilla/mux"
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 	"jinr.ru/greenlab/go-adc/pkg/srv"
 	"jinr.ru/greenlab/go-adc/pkg/srv/control/ifc"
-	"net/http"
-	"strconv"
 )
 
 const (
@@ -62,25 +63,31 @@ const (
 // Success response
 // swagger:response okResp
 type RespOk struct {
-   // in:body
-   Body struct {
-      // HTTP status code 200 - OK
-      Code int `json:"code"`
-   }
-}// Error Bad Request
+	// in:body
+	Body struct {
+		// HTTP status code 200 - OK
+		Code int `json:"code"`
+	}
+} // Error Bad Request
 // swagger:response badReq
 type ReqBadRequest struct {
-   // in:body
-   Body struct {
-      // HTTP status code 400 -  Bad Request
-      Code int `json:"code"`
-   }
+	// in:body
+	Body struct {
+		// HTTP status code 400 -  Bad Request
+		Code int `json:"code"`
+	}
 }
 
 // RegHex ...
 type RegHex struct {
-	Addr string // hexadecimal
+	Addr  string // hexadecimal
 	Value string // hexadecimal
+}
+
+type TrigSetup struct {
+	Timer     string `json:"timer"`
+	Threshold string `json:"threshold"`
+	Lemo      string `json:"lemo"`
 }
 
 type ApiServer struct {
@@ -97,8 +104,8 @@ func NewApiServer(ctx context.Context, cfg *config.Config, ctrl ifc.ControlServe
 
 	s := &ApiServer{
 		Context: ctx,
-		Config: cfg,
-		ctrl: ctrl,
+		Config:  cfg,
+		ctrl:    ctrl,
 	}
 	return s, nil
 }
@@ -131,7 +138,7 @@ func (s *ApiServer) regReadAllHex(device string) ([]*RegHex, error) {
 	var regsHex []*RegHex
 	for _, reg := range regs {
 		hexAddr, hexValue := reg.Hex()
-		regsHex = append(regsHex, &RegHex{ Addr: hexAddr, Value: hexValue })
+		regsHex = append(regsHex, &RegHex{Addr: hexAddr, Value: hexValue})
 	}
 	return regsHex, nil
 }
@@ -150,56 +157,57 @@ func (s *ApiServer) Run() error {
 func (s *ApiServer) configureRouter() {
 	s.Router = mux.NewRouter()
 	subRouter := s.Router.PathPrefix("/api").Subrouter()
-  // swagger:operation GET /r/device/addr get register
-  // ---
-  // summary: read register
-  // description: --
-  // responses:
-  //   "200":
-  //     "$ref": "#/responses/okResp"
-  //   "400":
-  //     "$ref": "#/responses/badReq"
+	// swagger:operation GET /r/device/addr get register
+	// ---
+	// summary: read register
+	// description: --
+	// responses:
+	//   "200":
+	//     "$ref": "#/responses/okResp"
+	//   "400":
+	//     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/reg/r/{device}/{addr:0x[0-9abcdef]{4}}", s.handleRegRead()).Methods("GET")
 	// swagger:operation GET /r/device read all registers
-  // ---
-  // summary: write register
-  // description: 
-  // responses:
-  //   "200":
-  //     "$ref": "#/responses/okResp"
-  //   "400":
-  //     "$ref": "#/responses/badReq"
-  subRouter.HandleFunc("/reg/r/{device}", s.handleRegReadAll()).Methods("GET")
-  // swagger:operation POST /w/device/addr write register
-  // ---
-  // summary: write register
-  // description: 
-  // responses:
-  //   "200":
-  //     "$ref": "#/responses/okResp"
-  //   "400":
-  //     "$ref": "#/responses/badReq"
+	// ---
+	// summary: write register
+	// description:
+	// responses:
+	//   "200":
+	//     "$ref": "#/responses/okResp"
+	//   "400":
+	//     "$ref": "#/responses/badReq"
+	subRouter.HandleFunc("/reg/r/{device}", s.handleRegReadAll()).Methods("GET")
+	// swagger:operation POST /w/device/addr write register
+	// ---
+	// summary: write register
+	// description:
+	// responses:
+	//   "200":
+	//     "$ref": "#/responses/okResp"
+	//   "400":
+	//     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/reg/w/{device}", s.handleRegWrite()).Methods("POST")
-  // swagger:operation GET /mstream/{action:start|stop}/device start/stop
-  // ---
-  // summary: start/stop aquisition for device
-  // description: 
-  // responses:
-  //   "200":mstream/{action:start|stop}/
-  //     "$ref": "#/responses/okResp"
-  //   "400":
-  //     "$ref": "#/responses/badReq"
+	// swagger:operation GET /mstream/{action:start|stop}/device start/stop
+	// ---
+	// summary: start/stop aquisition for device
+	// description:
+	// responses:
+	//   "200":mstream/{action:start|stop}/
+	//     "$ref": "#/responses/okResp"
+	//   "400":
+	//     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/mstream/{action:start|stop}/{device}", s.handleMStreamAction()).Methods("GET")
-  // swagger:operation GET /mstream/{action:start|stop}
-  // ---
-  // summary: start/stop aquisition for all devices
-  // description: 
-  // responses:
-  //   "200":
-  //     "$ref": "#/responses/okResp"
-  //   "400":
-  //     "$ref": "#/responses/badReq"
+	// swagger:operation GET /mstream/{action:start|stop}
+	// ---
+	// summary: start/stop aquisition for all devices
+	// description:
+	// responses:
+	//   "200":
+	//     "$ref": "#/responses/okResp"
+	//   "400":
+	//     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/mstream/{action:start|stop}", s.handleMStreamActionAll()).Methods("GET")
+	subRouter.HandleFunc("/trigger/{device}", s.handleTrigger()).Methods("POST")
 }
 
 func (s *ApiServer) handleRegRead() http.HandlerFunc {
@@ -329,6 +337,42 @@ func (s *ApiServer) handleMStreamActionAll() http.HandlerFunc {
 				What: "Wrong MStream action. Must be one of start/stop",
 			}
 			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+	}
+}
+
+func (s *ApiServer) handleTrigger() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		setup := &TrigSetup{}
+		err := json.NewDecoder(r.Body).Decode(setup)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		device, err := s.ctrl.GetDeviceByName(vars["device"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		if setup.Timer != "" {
+			val, _ := strconv.ParseBool(setup.Timer)
+			err = device.SetTriggerTimer(val)
+		}
+		if setup.Threshold != "" {
+			val, _ := strconv.ParseBool(setup.Threshold)
+			err = device.SetTriggerThreshold(val)
+		}
+		if setup.Lemo != "" {
+			val, _ := strconv.ParseBool(setup.Lemo)
+			err = device.SetTriggerLemo(val)
+		}
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
 		}
 	}
 }
