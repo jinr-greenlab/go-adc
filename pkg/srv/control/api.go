@@ -55,6 +55,7 @@ import (
 	"jinr.ru/greenlab/go-adc/pkg/log"
 	"jinr.ru/greenlab/go-adc/pkg/srv"
 	"jinr.ru/greenlab/go-adc/pkg/srv/control/ifc"
+	//"jinr.ru/greenlab/go-adc/pkg/device"
 )
 
 const (
@@ -89,6 +90,11 @@ type TrigSetup struct {
 	Timer     string `json:"timer"`
 	Threshold string `json:"threshold"`
 	Lemo      string `json:"lemo"`
+}
+
+type MAFSetup struct {
+	Selector int
+	BLC      int
 }
 
 type ApiServer struct {
@@ -209,6 +215,7 @@ func (s *ApiServer) configureRouter() {
 	//     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/mstream/{action:start|stop}", s.handleMStreamActionAll()).Methods("GET")
 	subRouter.HandleFunc("/trigger/{device}", s.handleTrigger()).Methods("POST")
+	subRouter.HandleFunc("/maf/{device}", s.handleMAF()).Methods("POST")
 }
 
 func (s *ApiServer) handleRegRead() http.HandlerFunc {
@@ -370,6 +377,33 @@ func (s *ApiServer) handleTrigger() http.HandlerFunc {
 			val, _ := strconv.ParseBool(setup.Lemo)
 			err = device.SetTriggerLemo(val)
 		}
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
+}
+
+func (s *ApiServer) handleMAF() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		setup := &MAFSetup{}
+
+		err := json.NewDecoder(r.Body).Decode(setup)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		device, err := s.ctrl.GetDeviceByName(vars["device"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		err = device.SetMafSelector(setup.Selector)
+		err = device.SetMafBlcThresh(setup.BLC)
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)

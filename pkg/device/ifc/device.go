@@ -24,6 +24,9 @@ type Device interface {
 	SetTriggerThreshold(val bool) error
 	SetTriggerLemo(val bool) error
 
+	SetMafSelector(val int) error
+	SetMafBlcThresh(val int) error
+
 	RegRead(addr uint16) (*layers.Reg, error)
 	RegReadAll() ([]*layers.Reg, error)
 	RegWrite(reg *layers.Reg) error
