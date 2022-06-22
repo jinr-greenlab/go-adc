@@ -17,8 +17,9 @@ package discover
 import (
 	"context"
 	"fmt"
-	"github.com/spf13/cobra"
 	"net"
+
+	"github.com/spf13/cobra"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/srv/discover"

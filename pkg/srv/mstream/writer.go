@@ -15,8 +15,9 @@
 package mstream
 
 import (
-	"jinr.ru/greenlab/go-adc/pkg/log"
 	"os"
+
+	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
 type Writer struct {

@@ -16,6 +16,7 @@ package control
 
 import (
 	"github.com/spf13/cobra"
+
 	"jinr.ru/greenlab/go-adc/cmd/control/reg"
 )
 

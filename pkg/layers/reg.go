@@ -17,11 +17,13 @@ package layers
 import (
 	"encoding/binary"
 	"fmt"
+	"hash/crc32"
+	"strconv"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"hash/crc32"
+
 	"jinr.ru/greenlab/go-adc/pkg/log"
-	"strconv"
 )
 
 const (
@@ -87,14 +89,14 @@ func (reg *RegLayer) LayerType() gopacket.LayerType {
 // it to MLinkLayer.SerializeTo method.
 func (reg *RegLayer) Serialize(buf []byte) {
 	for i, op := range reg.RegOps {
-		//log.Debug("Serializing RegOp: %s", op)
+		log.Debug("Serializing RegOp: %s", op)
 		offset := i * 4
 		if op.Read {
 			binary.LittleEndian.PutUint32(buf[offset:offset+4], 0x80000000|((uint32(op.Addr)&0x7fff)<<16))
 		} else {
 			binary.LittleEndian.PutUint32(buf[offset:offset+4], 0x00000000|((uint32(op.Addr)&0x7fff)<<16)|uint32(op.Value))
 		}
-		//log.Debug("Serialized RegOp: 0x%08x", buf[offset:offset+4])
+		log.Debug("Serialized RegOp: 0x%08x", buf[offset:offset+4])
 	}
 }
 
@@ -110,7 +112,7 @@ func (reg *RegLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Seria
 
 func (reg *RegLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	reg.BaseLayer = layers.BaseLayer{
-		Contents: data[:],
+		Contents: data,
 		Payload:  []byte{},
 	}
 	for i := 0; i < len(data)/4; i++ {

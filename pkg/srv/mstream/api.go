@@ -45,8 +45,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
 	"net/http"
+
+	"github.com/gorilla/mux"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/log"
@@ -142,7 +143,6 @@ func (s *ApiServer) configureRouter() {
 	//     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/connect_to_devices", s.handleConnectToDevices()).Methods("GET")
 	s.Router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", http.FileServer(http.Dir("./swaggerui/"))))
-
 }
 
 func (s *ApiServer) handlePersist() http.HandlerFunc {

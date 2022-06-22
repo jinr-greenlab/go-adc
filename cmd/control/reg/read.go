@@ -16,10 +16,12 @@ package reg
 
 import (
 	"fmt"
+	"sort"
+
 	"github.com/spf13/cobra"
+
 	"jinr.ru/greenlab/go-adc/pkg/command"
 	"jinr.ru/greenlab/go-adc/pkg/config"
-	"sort"
 )
 
 func NewReadCommand() *cobra.Command {

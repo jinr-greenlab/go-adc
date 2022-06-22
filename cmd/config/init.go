@@ -16,6 +16,7 @@ package config
 
 import (
 	"github.com/spf13/cobra"
+
 	"jinr.ru/greenlab/go-adc/pkg/config"
 )
 

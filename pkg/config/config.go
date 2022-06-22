@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+
 	"sigs.k8s.io/yaml"
 )
 
@@ -53,7 +54,7 @@ func (c *Config) Persist(overwrite bool) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(c.ConfigPath(), data, 0644)
+	err = ioutil.WriteFile(c.ConfigPath(), data, 0600)
 	if err != nil {
 		return err
 	}

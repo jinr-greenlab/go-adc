@@ -15,8 +15,10 @@
 package cmd
 
 import (
-	"github.com/spf13/cobra"
 	"io"
+
+	"github.com/spf13/cobra"
+
 	"jinr.ru/greenlab/go-adc/cmd/completion"
 	"jinr.ru/greenlab/go-adc/cmd/config"
 	"jinr.ru/greenlab/go-adc/cmd/control"

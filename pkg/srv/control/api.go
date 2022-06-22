@@ -49,6 +49,7 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
+
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
@@ -135,7 +136,7 @@ func (s *ApiServer) regReadAllHex(device string) ([]*RegHex, error) {
 	if err != nil {
 		return nil, err
 	}
-	var regsHex []*RegHex
+	regsHex := []*RegHex{}
 	for _, reg := range regs {
 		hexAddr, hexValue := reg.Hex()
 		regsHex = append(regsHex, &RegHex{Addr: hexAddr, Value: hexValue})
@@ -189,7 +190,7 @@ func (s *ApiServer) configureRouter() {
 	subRouter.HandleFunc("/reg/w/{device}", s.handleRegWrite()).Methods("POST")
 	// swagger:operation GET /mstream/{action:start|stop}/device start/stop
 	// ---
-	// summary: start/stop aquisition for device
+	// summary: start/stop acquisition for device
 	// description:
 	// responses:
 	//   "200":mstream/{action:start|stop}/
@@ -199,7 +200,7 @@ func (s *ApiServer) configureRouter() {
 	subRouter.HandleFunc("/mstream/{action:start|stop}/{device}", s.handleMStreamAction()).Methods("GET")
 	// swagger:operation GET /mstream/{action:start|stop}
 	// ---
-	// summary: start/stop aquisition for all devices
+	// summary: start/stop acquisition for all devices
 	// description:
 	// responses:
 	//   "200":

@@ -16,10 +16,12 @@ package control
 
 import (
 	"fmt"
+	"net"
+
 	"github.com/spf13/cobra"
+
 	"jinr.ru/greenlab/go-adc/pkg/command"
 	"jinr.ru/greenlab/go-adc/pkg/config"
-	"net"
 )
 
 const (

@@ -129,7 +129,7 @@ func (dd *DeviceDescription) SetTimestamp() error {
 func (dd *DeviceDescription) String() string {
 	result, err := yaml.Marshal(dd)
 	if err != nil {
-		log.Error("Error occured while marshaling device description, %s", err)
+		log.Error("Error occurred while marshaling device description, %s", err)
 		return ""
 	}
 	return fmt.Sprintf("---\n%s", string(result))

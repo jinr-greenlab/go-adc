@@ -16,9 +16,10 @@ package layers
 
 import (
 	"encoding/binary"
+	"hash/crc32"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"hash/crc32"
 )
 
 const (
@@ -74,7 +75,7 @@ func (mem *MemLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Seria
 
 func (mem *MemLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	mem.BaseLayer = layers.BaseLayer{
-		Contents: data[:],
+		Contents: data,
 		Payload:  []byte{},
 	}
 	hdr := binary.LittleEndian.Uint32(data[0:4])

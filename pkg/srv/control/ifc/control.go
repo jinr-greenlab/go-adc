@@ -15,9 +15,10 @@
 package ifc
 
 import (
+	"net"
+
 	deviceifc "jinr.ru/greenlab/go-adc/pkg/device/ifc"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
-	"net"
 )
 
 type ControlServer interface {

@@ -121,7 +121,6 @@ var _ deviceifc.Device = &Device{}
 
 // NewDevice ...
 func NewDevice(device *config.Device, ctrl ifc.ControlServer, state ifc.State) (*Device, error) {
-
 	d := &Device{
 		Device:                         device,
 		TriggerDelay:                   5,

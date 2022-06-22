@@ -17,10 +17,12 @@ package layers
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"sort"
+
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+
 	"jinr.ru/greenlab/go-adc/pkg/log"
-	"sort"
 )
 
 const (
@@ -168,7 +170,7 @@ func (mpd *MpdLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Seria
 	mpd.Trigger.Serialize(triggerBytes)
 	log.Debug("MPD SerializeTo: trigger:\n%s", hex.Dump(triggerBytes))
 
-	var channels []ChannelNum
+	channels := []ChannelNum{}
 	for c := range mpd.Data {
 		channels = append(channels, c)
 	}
@@ -185,7 +187,7 @@ func (mpd *MpdLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Seria
 		}
 		header.Serialize(headerBytes)
 		log.Debug("MPD SerializeTo: MpdMStreamHeader: data:\n%s", hex.Dump(headerBytes))
-		dataBytes, err := b.AppendBytes(len(mpd.Data[c].Bytes))
+		dataBytes, _ := b.AppendBytes(len(mpd.Data[c].Bytes))
 
 		mpd.Data[c].Serialize(dataBytes)
 		log.Debug("MPD SerializeTo: data:\n%s", hex.Dump(dataBytes))
