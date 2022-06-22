@@ -22,23 +22,23 @@ import (
 )
 
 const (
-	Nch = 64
+	Nch                = 64
 	FirRoundoffDefault = 1
-	FirRoundoffMax = 3
+	FirRoundoffMax     = 3
 )
 
 type FirParams struct {
 	PresetKey string
-	Enabled bool
-	Roundoff int
-	Coef []uint16
+	Enabled   bool
+	Roundoff  int
+	Coef      []uint16
 }
 
 func NewFirParams() *FirParams {
 	f := &FirParams{
 		Roundoff: FirRoundoffDefault,
-		Coef: make([]uint16, 16),
-		Enabled: false,
+		Coef:     make([]uint16, 16),
+		Enabled:  false,
 	}
 	f.Coef[0] = 32767
 	return f
@@ -51,26 +51,26 @@ func (f *FirParams) setRoundoff(value int) {
 	if value > FirRoundoffMax {
 		value = FirRoundoffMax
 	}
-    f.Roundoff = value
+	f.Roundoff = value
 }
 
 type DspParams struct {
-	fir *FirParams
-	Enabled bool
-	BlcThr int
-	MafEnabled bool
-	MafTapSel int
+	fir         *FirParams
+	Enabled     bool
+	BlcThr      int
+	MafEnabled  bool
+	MafTapSel   int
 	TestEnabled bool
 }
 
 func NewDspParams() *DspParams {
 	return &DspParams{
-		Enabled: false,
-		BlcThr: 100,
-		MafEnabled: false,
-		MafTapSel: 2,
+		Enabled:     false,
+		BlcThr:      100,
+		MafEnabled:  false,
+		MafTapSel:   2,
 		TestEnabled: false,
-		fir: NewFirParams(),
+		fir:         NewFirParams(),
 	}
 }
 
@@ -94,27 +94,27 @@ func (dsp *DspParams) getTestEnabled() bool {
 }
 
 type ChannelSettings struct {
-	Enabled bool
-	BaseLine int
-	TriggerEnabled bool
+	Enabled          bool
+	BaseLine         int
+	TriggerEnabled   bool
 	TriggerThreshold int
-	ZeroThreshold int
+	ZeroThreshold    int
 }
 
 type Device struct {
 	*config.Device
-	ChSettings [Nch]*ChannelSettings
-	TriggerDelay int
-	InvertInput bool
-	ZeroSuppressionEnabled bool
-	InvertThresholdTrigger bool
+	ChSettings                     [Nch]*ChannelSettings
+	TriggerDelay                   int
+	InvertInput                    bool
+	ZeroSuppressionEnabled         bool
+	InvertThresholdTrigger         bool
 	InvertZeroSupperssionThreshold bool
-	SoftwareZeroSuppression bool
-	MStreamEnabled bool
-	dspParams *DspParams
-	Run bool
-	ctrl ifc.ControlServer
-	state ifc.State
+	SoftwareZeroSuppression        bool
+	MStreamEnabled                 bool
+	dspParams                      *DspParams
+	Run                            bool
+	ctrl                           ifc.ControlServer
+	state                          ifc.State
 }
 
 var _ deviceifc.Device = &Device{}
@@ -123,23 +123,23 @@ var _ deviceifc.Device = &Device{}
 func NewDevice(device *config.Device, ctrl ifc.ControlServer, state ifc.State) (*Device, error) {
 
 	d := &Device{
-		Device: device,
-		TriggerDelay: 5,
-		InvertInput: false,
-		ZeroSuppressionEnabled: false,
-		InvertThresholdTrigger: false,
+		Device:                         device,
+		TriggerDelay:                   5,
+		InvertInput:                    false,
+		ZeroSuppressionEnabled:         false,
+		InvertThresholdTrigger:         false,
 		InvertZeroSupperssionThreshold: false,
-		SoftwareZeroSuppression: false,
-		ctrl: ctrl,
-		state: state,
+		SoftwareZeroSuppression:        false,
+		ctrl:                           ctrl,
+		state:                          state,
 	}
 	for i := 0; i < Nch; i++ {
 		d.ChSettings[i] = &ChannelSettings{
-			Enabled: true,
-			BaseLine: 0,
-			TriggerEnabled: true,
+			Enabled:          true,
+			BaseLine:         0,
+			TriggerEnabled:   true,
 			TriggerThreshold: 100,
-			ZeroThreshold: -0x8000,
+			ZeroThreshold:    -0x8000,
 		}
 	}
 	return d, nil
@@ -162,7 +162,7 @@ func (d *Device) RegWrite(reg *layers.Reg) error {
 	ops := []*layers.RegOp{
 		{
 			Read: false,
-			Reg: reg,
+			Reg:  reg,
 		},
 	}
 	return d.ctrl.RegRequest(ops, d.IP)
@@ -174,60 +174,60 @@ func (d *Device) UpdateReg(reg *layers.Reg) error {
 }
 
 func (d *Device) SetTriggerTimer(val bool) error {
-  state, err := d.RegRead(RegMap[RegTrigCtrl])
-  reg := state.Value
-  if err != nil {
-    return err
-  }
+	state, err := d.RegRead(RegMap[RegTrigCtrl])
+	reg := state.Value
+	if err != nil {
+		return err
+	}
 
-  if val {
-    reg |= RegTrigStatusBitTimer
-  } else {
-    reg &= ^RegTrigStatusBitTimer
-  }
+	if val {
+		reg |= RegTrigStatusBitTimer
+	} else {
+		reg &= ^RegTrigStatusBitTimer
+	}
 
-  ops := []*layers.RegOp{
-    {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: reg}},
-  }
-  return d.ctrl.RegRequest(ops, d.IP)
+	ops := []*layers.RegOp{
+		{Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: reg}},
+	}
+	return d.ctrl.RegRequest(ops, d.IP)
 }
 
 func (d *Device) SetTriggerThreshold(val bool) error {
-  state, err := d.RegRead(RegMap[RegTrigCtrl])
-  reg := state.Value
-  if err != nil {
-    return err
-  }
-  
-  if val {
-    reg |= RegTrigStatusBitThreshold
-  } else {
-    reg &= ^RegTrigStatusBitThreshold
-  }
+	state, err := d.RegRead(RegMap[RegTrigCtrl])
+	reg := state.Value
+	if err != nil {
+		return err
+	}
 
-  ops := []*layers.RegOp{
-    {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: reg}},
-  }
-  return d.ctrl.RegRequest(ops, d.IP)
+	if val {
+		reg |= RegTrigStatusBitThreshold
+	} else {
+		reg &= ^RegTrigStatusBitThreshold
+	}
+
+	ops := []*layers.RegOp{
+		{Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: reg}},
+	}
+	return d.ctrl.RegRequest(ops, d.IP)
 }
 
 func (d *Device) SetTriggerLemo(val bool) error {
-  state, err := d.RegRead(RegMap[RegTrigCtrl])
-  reg := state.Value
-  if err != nil {
-    return err
-  }
-  
-  if val {
-    reg |= RegTrigStatusBitLemo
-  } else {
-    reg &= ^RegTrigStatusBitLemo
-  }
+	state, err := d.RegRead(RegMap[RegTrigCtrl])
+	reg := state.Value
+	if err != nil {
+		return err
+	}
 
-  ops := []*layers.RegOp{
-    {Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: reg}},
-  }
-  return d.ctrl.RegRequest(ops, d.IP)
+	if val {
+		reg |= RegTrigStatusBitLemo
+	} else {
+		reg &= ^RegTrigStatusBitLemo
+	}
+
+	ops := []*layers.RegOp{
+		{Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: reg}},
+	}
+	return d.ctrl.RegRequest(ops, d.IP)
 }
 
 // for details how to start and stop streaming data see DominoDevice::writeSettings()
@@ -237,8 +237,8 @@ func (d *Device) MStreamStart() error {
 	var ops []*layers.RegOp
 	ops = []*layers.RegOp{
 		{Reg: &layers.Reg{Addr: RegMap[RegDeviceCtrl], Value: 0}},
-		{Reg: &layers.Reg{Addr: RegMap[RegDeviceCtrl],	Value: 0x8000}},
-		{Reg: &layers.Reg{Addr: RegMap[RegMstreamRunCtrl],	Value: 1}},
+		{Reg: &layers.Reg{Addr: RegMap[RegDeviceCtrl], Value: 0x8000}},
+		{Reg: &layers.Reg{Addr: RegMap[RegMstreamRunCtrl], Value: 1}},
 	}
 	return d.ctrl.RegRequest(ops, d.IP)
 }
@@ -264,7 +264,7 @@ func (d *Device) MemWrite(addr uint32, data []uint32) error {
 }
 
 func ChBaseMemAddr(ch int) uint32 {
-	return uint32(ch) << 14;
+	return uint32(ch) << 14
 }
 
 // IsRunning checks if RegRunStatusBitRunning bit is set
@@ -273,7 +273,7 @@ func (d *Device) IsRunning() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return 0 != status.Value & RegRunStatusBitRunning, nil
+	return 0 != status.Value&RegRunStatusBitRunning, nil
 }
 
 func (d *Device) encodeChCtrlRegValue(ch int) uint16 {
@@ -320,7 +320,6 @@ func (d *Device) WriteChCtrl(ch int) error {
 	return nil
 }
 
-
 //func (d *Device) WriteSettings() error {
 //	if d.MStreamEnabled && ! d.Run {
 //		d.MStreamStop()
@@ -332,4 +331,3 @@ func (d *Device) WriteChCtrl(ch int) error {
 //	}
 //	return nil
 //}
-

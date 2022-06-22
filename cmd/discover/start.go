@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	IPOptionName = "ip"
+	IPOptionName    = "ip"
 	IfaceOptionName = "iface"
 )
 
@@ -34,8 +34,8 @@ func NewStartCommand() *cobra.Command {
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "start",
-		Short:         "Start discover server",
+		Use:   "start",
+		Short: "Start discover server",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if ip != "" {
 				parsedIP := net.ParseIP(ip)

@@ -22,52 +22,51 @@ import (
 )
 
 const (
-	NumEventBuilders = 10
+	NumEventBuilders      = 10
 	BuilderFragmentChSize = 8
 )
 
-
 type EventBuilder struct {
-	Id int
-	ManagerId string
-	Free bool
-	DeviceSerial uint32
-	EventNum uint32
+	Id              int
+	ManagerId       string
+	Free            bool
+	DeviceSerial    uint32
+	EventNum        uint32
 	TriggerChannels uint64
-	DataChannels uint64
-	DataSize uint32
-	DeviceID uint8
+	DataChannels    uint64
+	DataSize        uint32
+	DeviceID        uint8
 
 	Trigger *layers.MStreamTrigger
-	Data map[layers.ChannelNum]*layers.MStreamData
-	Length uint32
+	Data    map[layers.ChannelNum]*layers.MStreamData
+	Length  uint32
 
 	FragmentCh chan *layers.MStreamFragment
-	mpdCh chan<- []byte
-	seq <-chan uint32
+	mpdCh      chan<- []byte
+	seq        <-chan uint32
 }
 
 // NewEvent ...
 func NewEventBuilder(id int, managerId string, mpdCh chan<- []byte, seq <-chan uint32) *EventBuilder {
 	return &EventBuilder{
-		Id: id,
-		ManagerId: managerId,
-		Free: true,
-		DeviceSerial: 0,
-		EventNum: 0,
+		Id:              id,
+		ManagerId:       managerId,
+		Free:            true,
+		DeviceSerial:    0,
+		EventNum:        0,
 		TriggerChannels: 0,
-		DataChannels: 0,
-		Trigger: nil,
-		Data: make(map[layers.ChannelNum]*layers.MStreamData),
-		DataSize: 0,
-		Length: 0,
-		FragmentCh: make(chan *layers.MStreamFragment, BuilderFragmentChSize),
-		mpdCh: mpdCh,
-		seq: seq,
+		DataChannels:    0,
+		Trigger:         nil,
+		Data:            make(map[layers.ChannelNum]*layers.MStreamData),
+		DataSize:        0,
+		Length:          0,
+		FragmentCh:      make(chan *layers.MStreamFragment, BuilderFragmentChSize),
+		mpdCh:           mpdCh,
+		seq:             seq,
 	}
 }
 
-func countDataFragments(channels uint64) (count uint32){
+func countDataFragments(channels uint64) (count uint32) {
 	// we use here Brian Kernighan’s algorithm
 	for channels > 0 {
 		channels &= channels - 1
@@ -78,7 +77,7 @@ func countDataFragments(channels uint64) (count uint32){
 
 func (b *EventBuilder) Clear() {
 	b.Free = true
-	b.EventNum = <- b.seq
+	b.EventNum = <-b.seq
 	b.TriggerChannels = 0
 	b.DataChannels = 0
 	b.Trigger = nil
@@ -101,28 +100,28 @@ func (b *EventBuilder) CloseEvent() {
 	dataCount := countDataFragments(b.DataChannels)
 	// Total data length is the total length of all data fragments + total length of all MpdMStreamHeader headers
 	// data length + (num data fragments + one trigger fragment) * MStream header size
-	deviceHeaderLength := b.Length + (dataCount + 1) * 4
+	deviceHeaderLength := b.Length + (dataCount+1)*4
 	// + 8 bytes (which is the size of MpdDeviceHeader)
 	eventHeaderLength := deviceHeaderLength + 8
 
 	mpd := &layers.MpdLayer{
 		MpdTimestampHeader: &layers.MpdTimestampHeader{
-			Sync: layers.MpdTimestampMagic,
-			Length: 8,
+			Sync:      layers.MpdTimestampMagic,
+			Length:    8,
 			Timestamp: srv.Now(),
 		},
 		MpdEventHeader: &layers.MpdEventHeader{
-			Sync: layers.MpdSyncMagic,
+			Sync:     layers.MpdSyncMagic,
 			EventNum: b.EventNum,
-			Length: eventHeaderLength,
+			Length:   eventHeaderLength,
 		},
 		MpdDeviceHeader: &layers.MpdDeviceHeader{
 			DeviceSerial: b.DeviceSerial,
-			DeviceID: b.DeviceID,
-			Length: deviceHeaderLength,
+			DeviceID:     b.DeviceID,
+			Length:       deviceHeaderLength,
 		},
 		Trigger: b.Trigger,
-		Data: b.Data,
+		Data:    b.Data,
 	}
 
 	buf := gopacket.NewSerializeBuffer()
@@ -152,7 +151,7 @@ func (b *EventBuilder) SetFragment(f *layers.MStreamFragment) {
 
 	if f.Subtype == layers.MStreamTriggerSubtype {
 		b.DeviceID = f.DeviceID
-		b.TriggerChannels = uint64(f.MStreamTrigger.HiCh) << 32 | uint64(f.MStreamTrigger.LowCh)
+		b.TriggerChannels = uint64(f.MStreamTrigger.HiCh)<<32 | uint64(f.MStreamTrigger.LowCh)
 		b.Trigger = f.MStreamTrigger
 		if b.DataChannels == b.TriggerChannels {
 			b.CloseEvent()
@@ -167,18 +166,18 @@ func (b *EventBuilder) SetFragment(f *layers.MStreamFragment) {
 }
 
 func (b *EventBuilder) Run() {
-	b.EventNum = <- b.seq
+	b.EventNum = <-b.seq
 	log.Info("Run EventBuilder: %s builder: %d event: %d", b.ManagerId, b.Id, b.EventNum)
 	for {
-		f := <- b.FragmentCh
-		if f.MStreamPayloadHeader.EventNum >= b.EventNum + NumEventBuilders {
+		f := <-b.FragmentCh
+		if f.MStreamPayloadHeader.EventNum >= b.EventNum+NumEventBuilders {
 			//log.Info("Force close event: " +
 			//	"%s %d " +
 			//	"builder event: %d " +
 			//	"fragment event: %d",
 			//	b.ManagerId, b.Id, b.EventNum, f.MStreamPayloadHeader.EventNum)
 			b.CloseEvent()
-			b.EventNum = <- b.seq
+			b.EventNum = <-b.seq
 			//log.Info("Change event number: manager: %s builder: %d event: %d", b.ManagerId, b.Id, b.EventNum)
 		}
 		if f.MStreamPayloadHeader.EventNum == b.EventNum {
@@ -189,25 +188,25 @@ func (b *EventBuilder) Run() {
 }
 
 type EventBuilderManager struct {
-	deviceName string
+	deviceName    string
 	eventBuilders []*EventBuilder
-	writerCh chan<- []byte
-	fragmentCh <-chan *layers.MStreamFragment
-	seq chan uint32
-	exitCh <-chan bool
+	writerCh      chan<- []byte
+	fragmentCh    <-chan *layers.MStreamFragment
+	seq           chan uint32
+	exitCh        <-chan bool
 }
 
 func NewEventBuilderManager(
-		deviceName string,
-		fragmentCh <-chan *layers.MStreamFragment,
-		writerCh chan<- []byte,
-		exitCh <-chan bool) *EventBuilderManager {
+	deviceName string,
+	fragmentCh <-chan *layers.MStreamFragment,
+	writerCh chan<- []byte,
+	exitCh <-chan bool) *EventBuilderManager {
 	log.Info("Creating EventBuilderManager: %s", deviceName)
 	return &EventBuilderManager{
 		deviceName: deviceName,
-		writerCh: writerCh,
+		writerCh:   writerCh,
 		fragmentCh: fragmentCh,
-		exitCh: exitCh,
+		exitCh:     exitCh,
 	}
 }
 

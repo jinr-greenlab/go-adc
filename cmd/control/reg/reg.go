@@ -20,14 +20,14 @@ import (
 
 const (
 	DeviceOptionName = "device"
-	AddrOptionName = "addr"
-	ValueOptionName = "value"
+	AddrOptionName   = "addr"
+	ValueOptionName  = "value"
 )
 
 func NewRegCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "reg",
-		Short:         "Low level control by means of reading from/writing to registers",
+		Use:   "reg",
+		Short: "Low level control by means of reading from/writing to registers",
 	}
 	cmd.AddCommand(NewReadCommand())
 	cmd.AddCommand(NewWriteCommand())

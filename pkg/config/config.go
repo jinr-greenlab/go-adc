@@ -25,16 +25,16 @@ import (
 )
 
 type Device struct {
-	Name string `json:"name,omitempty"`
-	IP *net.IP `json:"ip,omitempty"`
+	Name string  `json:"name,omitempty"`
+	IP   *net.IP `json:"ip,omitempty"`
 }
 
 type Config struct {
-	DiscoverIP *net.IP `json:"discoverIP,omitempty"`
-	DiscoverIface string `json:"discoverIface,omitempty"`
-	IP *net.IP `json:"ip,omitempty"`
-	Devices []*Device `json:"devices"`
-	dirpath string
+	DiscoverIP    *net.IP   `json:"discoverIP,omitempty"`
+	DiscoverIface string    `json:"discoverIface,omitempty"`
+	IP            *net.IP   `json:"ip,omitempty"`
+	Devices       []*Device `json:"devices"`
+	dirpath       string
 }
 
 // Persist serialized the config and saves it to the config file
@@ -117,12 +117,10 @@ func NewDefaultConfig() *Config {
 	ip := net.ParseIP(DefaultIP)
 
 	return &Config{
-		DiscoverIP: &discoverIP,
+		DiscoverIP:    &discoverIP,
 		DiscoverIface: DefaultDiscoverIface,
-		IP: &ip,
-		Devices: []*Device{},
-		dirpath: DefaultConfigDir(),
+		IP:            &ip,
+		Devices:       []*Device{},
+		dirpath:       DefaultConfigDir(),
 	}
 }
-
-

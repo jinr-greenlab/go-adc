@@ -31,8 +31,8 @@ func NewStartCommand() *cobra.Command {
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "start",
-		Short:         "Start control server",
+		Use:   "start",
+		Short: "Start control server",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if ip != "" {
 				parsedIP := net.ParseIP(ip)

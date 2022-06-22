@@ -32,20 +32,20 @@ import (
 )
 
 const (
-	MStreamPort = 33301
-	WriterChSize = 100
+	MStreamPort    = 33301
+	WriterChSize   = 100
 	FragmentChSize = 100
-	InChSize = 100
+	InChSize       = 100
 )
 
 type MStreamServer struct {
 	srv.Server
-	api *ApiServer
-	packetSources map[string]*PacketSource
-	writers map[string]io.Writer
-	writerChs map[string] chan []byte
-	writerStateChs map[string] chan string
-	fragmentChs map[string] chan *layers.MStreamFragment
+	api            *ApiServer
+	packetSources  map[string]*PacketSource
+	writers        map[string]io.Writer
+	writerChs      map[string]chan []byte
+	writerStateChs map[string]chan string
+	fragmentChs    map[string]chan *layers.MStreamFragment
 }
 
 func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, error) {
@@ -58,16 +58,16 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 
 	s := &MStreamServer{
 		Server: srv.Server{
-			Context:    ctx,
-			Config:     cfg,
-			UDPAddr:    uaddr,
-			ChOut:      make(chan srv.OutPacket),
+			Context: ctx,
+			Config:  cfg,
+			UDPAddr: uaddr,
+			ChOut:   make(chan srv.OutPacket),
 		},
-		packetSources: make(map[string]*PacketSource),
-		writers: make(map[string]io.Writer),
-		writerChs: make(map[string] chan []byte),
-		writerStateChs: make(map[string] chan string),
-		fragmentChs: make(map[string] chan *layers.MStreamFragment),
+		packetSources:  make(map[string]*PacketSource),
+		writers:        make(map[string]io.Writer),
+		writerChs:      make(map[string]chan []byte),
+		writerStateChs: make(map[string]chan string),
+		fragmentChs:    make(map[string]chan *layers.MStreamFragment),
 	}
 
 	for _, device := range cfg.Devices {
@@ -123,9 +123,9 @@ func (s *MStreamServer) Run() error {
 			}
 
 			captureInfo := gopacket.CaptureInfo{
-				Length: length,
+				Length:        length,
 				CaptureLength: length,
-				Timestamp: time.Now(),
+				Timestamp:     time.Now(),
 				AncillaryData: []interface{}{udpAddr, device.Name},
 			}
 			packet := srv.InPacket{CaptureInfo: captureInfo, Data: make([]byte, length)}
@@ -306,7 +306,7 @@ func (s *MStreamServer) SendAck(src, seq, fragmentID, fragmentOffset uint16, udp
 	//log.Debug("Put MStream Ack to output queue: udpaddr: %s ack: %s", udpAddr, hex.EncodeToString(buf.Bytes()))
 	//log.Info("Put MStream ack to output queue: udpaddr: %s fragment: %d", udpAddr, fragmentID)
 	s.ChOut <- srv.OutPacket{
-		Data: buf.Bytes(),
+		Data:    buf.Bytes(),
 		UDPAddr: udpAddr,
 	}
 	return nil

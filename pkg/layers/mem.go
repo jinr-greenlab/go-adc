@@ -28,8 +28,8 @@ const (
 
 type MemOp struct {
 	Read bool
-	Addr uint32 // 22 bits
-	Size uint32 // 9 bits
+	Addr uint32   // 22 bits
+	Size uint32   // 9 bits
 	Data []uint32 // if Read is true, Value is ignored
 }
 
@@ -52,10 +52,10 @@ func (reg *MemLayer) LayerType() gopacket.LayerType {
 // it to MLinkLayer.SerializeTo method.
 func (mem *MemLayer) Serialize(buf []byte) {
 	if mem.MemOp.Read {
-		binary.LittleEndian.PutUint32(buf[0:4], 0x80000000 | ((mem.Size & 0x1ff) << 22) | (mem.Addr & 0x3fffff))
+		binary.LittleEndian.PutUint32(buf[0:4], 0x80000000|((mem.Size&0x1ff)<<22)|(mem.Addr&0x3fffff))
 	} else {
-		binary.LittleEndian.PutUint32(buf[0:4], 0x00000000 | ((mem.Size & 0x1ff) << 22) | (mem.Addr & 0x3fffff))
-		for i, word := range(mem.Data)  {
+		binary.LittleEndian.PutUint32(buf[0:4], 0x00000000|((mem.Size&0x1ff)<<22)|(mem.Addr&0x3fffff))
+		for i, word := range mem.Data {
 			offset := (i + 1) * 4
 			binary.LittleEndian.PutUint32(buf[offset:offset+4], word)
 		}
@@ -75,10 +75,10 @@ func (mem *MemLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Seria
 func (mem *MemLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	mem.BaseLayer = layers.BaseLayer{
 		Contents: data[:],
-		Payload: []byte{},
+		Payload:  []byte{},
 	}
 	hdr := binary.LittleEndian.Uint32(data[0:4])
-	if int8((hdr & 0x80000000) >> 31) == 1 {
+	if int8((hdr&0x80000000)>>31) == 1 {
 		mem.Read = true
 	} else {
 		mem.Read = false
@@ -118,7 +118,7 @@ func MemOpToBytes(op *MemOp, seq uint16) ([]byte, error) {
 
 	mem := &MemLayer{}
 	mem.MemOp = op
-	memBytes := make([]byte, (1 + op.Size) * 4) // one word for Mem request header and Size words for data
+	memBytes := make([]byte, (1+op.Size)*4) // one word for Mem request header and Size words for data
 	mem.Serialize(memBytes)
 
 	ml.Crc = crc32.ChecksumIEEE(append(mlHeaderBytes, memBytes...))

@@ -27,8 +27,8 @@ func NewPersistCommand() *cobra.Command {
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:    fmt.Sprintf("persist"),
-		Short:  "Persist data to file",
+		Use:   fmt.Sprintf("persist"),
+		Short: "Persist data to file",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			apiClient := command.NewApiClient(cfg)
 			return apiClient.MStreamPersist(dir, filePrefix)

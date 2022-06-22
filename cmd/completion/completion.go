@@ -19,7 +19,6 @@ import (
 )
 
 const (
-
 	completionExample = `
 Save shell completion to a file
 # go-adc completion > $HOME/.go-adc_completions
@@ -32,10 +31,10 @@ Apply completions to the current bash instance
 // NewCommand creates a cobra command object for generating bash completion script
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:       "completion",
-		Short:     "Generate completion script for bash",
-		Example:   completionExample,
-		RunE:      func(cmd *cobra.Command, args []string) error {
+		Use:     "completion",
+		Short:   "Generate completion script for bash",
+		Example: completionExample,
+		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Root().GenBashCompletion(cmd.OutOrStdout())
 		},
 	}

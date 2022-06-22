@@ -30,7 +30,7 @@ const (
 )
 
 type Reg struct {
-	Addr uint16
+	Addr  uint16
 	Value uint16
 }
 
@@ -53,7 +53,7 @@ func NewRegFromHex(hexAddr, hexValue string) (*Reg, error) {
 		return nil, err
 	}
 	return &Reg{
-		Addr: uint16(addr),
+		Addr:  uint16(addr),
 		Value: uint16(value),
 	}, nil
 }
@@ -90,9 +90,9 @@ func (reg *RegLayer) Serialize(buf []byte) {
 		//log.Debug("Serializing RegOp: %s", op)
 		offset := i * 4
 		if op.Read {
-			binary.LittleEndian.PutUint32(buf[offset:offset+4], 0x80000000|((uint32(op.Addr) & 0x7fff) << 16))
+			binary.LittleEndian.PutUint32(buf[offset:offset+4], 0x80000000|((uint32(op.Addr)&0x7fff)<<16))
 		} else {
-			binary.LittleEndian.PutUint32(buf[offset:offset+4], 0x00000000|((uint32(op.Addr) & 0x7fff) << 16) | uint32(op.Value))
+			binary.LittleEndian.PutUint32(buf[offset:offset+4], 0x00000000|((uint32(op.Addr)&0x7fff)<<16)|uint32(op.Value))
 		}
 		//log.Debug("Serialized RegOp: 0x%08x", buf[offset:offset+4])
 	}
@@ -111,11 +111,11 @@ func (reg *RegLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Seria
 func (reg *RegLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	reg.BaseLayer = layers.BaseLayer{
 		Contents: data[:],
-		Payload: []byte{},
+		Payload:  []byte{},
 	}
-	for i := 0; i < len(data) / 4; i++ {
+	for i := 0; i < len(data)/4; i++ {
 		offset := i * 4
-		word := binary.LittleEndian.Uint32(data[offset+0:offset+4])
+		word := binary.LittleEndian.Uint32(data[offset+0 : offset+4])
 		regOp := &RegOp{Reg: &Reg{}}
 		if ((word & 0x80000000) >> 31) == 1 {
 			regOp.Read = true
@@ -157,7 +157,7 @@ func RegOpsToBytes(ops []*RegOp, seq uint16) ([]byte, error) {
 
 	reg := &RegLayer{}
 	reg.RegOps = ops
-	regBytes := make([]byte, len(ops) * 4)
+	regBytes := make([]byte, len(ops)*4)
 	reg.Serialize(regBytes)
 
 	ml.Crc = crc32.ChecksumIEEE(append(mlHeaderBytes, regBytes...))

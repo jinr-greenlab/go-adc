@@ -60,7 +60,7 @@ func NewState(ctx context.Context, cfg *config.Config) (ifc.State, error) {
 	}
 	return &State{
 		Context: ctx,
-		DB: db,
+		DB:      db,
 	}, nil
 }
 
@@ -130,7 +130,7 @@ func (s *State) GetReg(addr uint16, deviceName string) (*layers.Reg, error) {
 		return nil, err
 	}
 	return &layers.Reg{
-		Addr: addr,
+		Addr:  addr,
 		Value: value,
 	}, nil
 }

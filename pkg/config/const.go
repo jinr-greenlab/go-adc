@@ -15,11 +15,11 @@
 package config
 
 const (
-	ConfigDir = ".go-adc"
-	ConfigFile = "config"
-	DBFile = "db.bolt"
-	DiscoverDBFile = "discoverdb.bolt"
-	DefaultDiscoverIP = "239.192.1.1"
+	ConfigDir            = ".go-adc"
+	ConfigFile           = "config"
+	DBFile               = "db.bolt"
+	DiscoverDBFile       = "discoverdb.bolt"
+	DefaultDiscoverIP    = "239.192.1.1"
 	DefaultDiscoverIface = "eth0"
-	DefaultIP = "192.168.1.100"
+	DefaultIP            = "192.168.1.100"
 )

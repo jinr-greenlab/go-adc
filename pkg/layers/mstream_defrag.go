@@ -33,38 +33,37 @@ const (
 
 // acceptedRange = 2*(hwBufSize-1) * FRAGMENTS_IN_PACKAGE_2_2;
 
-
 // FragmentBuilder holds a linked list which is used to store MStream fragment parts.
 // It stores internal counters/flags to track the state of the MStream flow.
 type FragmentBuilder struct {
-	FragmentID             uint16
-	DeviceID               uint8
-	Flags                  uint8
+	FragmentID uint16
+	DeviceID   uint8
+	Flags      uint8
 	Subtype
-	Free                   bool
-	Parts                  *list.List
-	Highest                uint16
-	TotalLength            uint16
-	LastFragmentReceived   bool
-	Completed              bool
-	closeCh                chan<- *MStreamFragment
-	mgr                    *FragmentBuilderManager
+	Free                 bool
+	Parts                *list.List
+	Highest              uint16
+	TotalLength          uint16
+	LastFragmentReceived bool
+	Completed            bool
+	closeCh              chan<- *MStreamFragment
+	mgr                  *FragmentBuilderManager
 }
 
 func NewFragmentBuilder(mgr *FragmentBuilderManager, fragmentId uint16, closeCh chan<- *MStreamFragment) *FragmentBuilder {
 	return &FragmentBuilder{
-		mgr: mgr,
-		FragmentID: fragmentId,
-		DeviceID: 0,
-		Flags: 0,
-		Subtype: 0,
-		Free: true,
-		Parts: list.New(),
-		Highest: 0,
-		TotalLength: 0,
+		mgr:                  mgr,
+		FragmentID:           fragmentId,
+		DeviceID:             0,
+		Flags:                0,
+		Subtype:              0,
+		Free:                 true,
+		Parts:                list.New(),
+		Highest:              0,
+		TotalLength:          0,
 		LastFragmentReceived: false,
-		Completed: false,
-		closeCh: closeCh,
+		Completed:            false,
+		closeCh:              closeCh,
 	}
 }
 
@@ -80,7 +79,6 @@ func (b *FragmentBuilder) Clear() {
 	b.LastFragmentReceived = false
 	b.Completed = false
 }
-
 
 func (b *FragmentBuilder) CloseFragment() {
 	//log.Info("Close fragment: %s %d", b.mgr.deviceName, b.FragmentID)
@@ -105,18 +103,18 @@ func (b *FragmentBuilder) CloseFragment() {
 	}
 
 	assembled := &MStreamFragment{
-		DeviceID: b.DeviceID,
-		Flags:    b.Flags,
-		Subtype:  b.Subtype,
+		DeviceID:       b.DeviceID,
+		Flags:          b.Flags,
+		Subtype:        b.Subtype,
 		FragmentLength: b.Highest,
-		FragmentID: b.FragmentID,
+		FragmentID:     b.FragmentID,
 		FragmentOffset: 0,
-		Data: data,
+		Data:           data,
 	}
 	assembled.SetLastFragment(true)
 	err := assembled.DecodePayload()
 	if err != nil {
-		log.Error("Error while decoding fragment payload: " +
+		log.Error("Error while decoding fragment payload: "+
 			"%s %d error: %s", b.mgr.deviceName, b.FragmentID, err)
 		return
 	}
@@ -124,7 +122,6 @@ func (b *FragmentBuilder) CloseFragment() {
 	b.closeCh <- assembled
 	b.mgr.SetLastClosedFragment(b.FragmentID)
 }
-
 
 func (b *FragmentBuilder) SetFragment(f *MStreamFragment) {
 	if b.Free {
@@ -155,7 +152,7 @@ func (b *FragmentBuilder) SetFragment(f *MStreamFragment) {
 	}
 
 	// After inserting the fragment, we update the fragment list state
-	if b.Highest < f.FragmentOffset + f.FragmentLength {
+	if b.Highest < f.FragmentOffset+f.FragmentLength {
 		b.Highest = f.FragmentOffset + f.FragmentLength
 	}
 	b.TotalLength += f.FragmentLength
@@ -174,20 +171,19 @@ func (b *FragmentBuilder) SetFragment(f *MStreamFragment) {
 		b.Completed = true
 	}
 
-	if b.Completed && (b.mgr.GetLastClosedFragment() + 1) == b.FragmentID {
+	if b.Completed && (b.mgr.GetLastClosedFragment()+1) == b.FragmentID {
 		b.CloseFragment()
 	}
 }
 
-
 type FragmentBuilderManager struct {
-	mu sync.RWMutex
+	mu         sync.RWMutex
 	deviceName string
 	// fragmentBuilders field is an in memory buffer which is used to store
 	// MStream fragment parts as they are received and until we are
 	// able to assemble them
-	fragmentBuilders []*FragmentBuilder
-	closeCh chan<- *MStreamFragment
+	fragmentBuilders   []*FragmentBuilder
+	closeCh            chan<- *MStreamFragment
 	lastClosedFragment uint16
 }
 
@@ -227,5 +223,3 @@ func (m *FragmentBuilderManager) SetFragment(f *MStreamFragment) {
 
 	m.fragmentBuilders[f.FragmentID].SetFragment(f)
 }
-
-

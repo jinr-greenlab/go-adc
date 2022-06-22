@@ -28,8 +28,8 @@ import (
 
 type ApiClient struct {
 	*config.Config
-	ApiPrefix string
-	MStreamApiPrefix string
+	ApiPrefix         string
+	MStreamApiPrefix  string
 	DiscoverApiPrefix string
 }
 
@@ -37,9 +37,9 @@ var _ ifc.ApiClient = &ApiClient{}
 
 func NewApiClient(cfg *config.Config) ifc.ApiClient {
 	return &ApiClient{
-		Config: cfg,
-		ApiPrefix: fmt.Sprintf("http://%s:%d/api", cfg.IP, control.ApiPort),
-		MStreamApiPrefix: fmt.Sprintf("http://%s:%d/api", cfg.IP, mstream.ApiPort),
+		Config:            cfg,
+		ApiPrefix:         fmt.Sprintf("http://%s:%d/api", cfg.IP, control.ApiPort),
+		MStreamApiPrefix:  fmt.Sprintf("http://%s:%d/api", cfg.IP, mstream.ApiPort),
 		DiscoverApiPrefix: fmt.Sprintf("http://%s:%d/api", cfg.IP, discover.ApiPort),
 	}
 }
@@ -97,14 +97,14 @@ func (c *ApiClient) RegReadAll(device string) (map[string]string, error) {
 // RegWrite sends request to write the value to a register of a device
 func (c *ApiClient) RegWrite(device, addr, value string) error {
 	reg := &control.RegHex{
-		Addr: addr,
+		Addr:  addr,
 		Value: value,
 	}
 	r, err := req.Post(c.regWriteUrl(device), req.BodyJSON(reg))
 	if err != nil {
 		return err
 	}
-	if ! (r.Response().StatusCode != 200) {
+	if !(r.Response().StatusCode != 200) {
 		return errors.New(r.Response().Status)
 	}
 	return nil
@@ -161,7 +161,7 @@ func (c *ApiClient) MStreamStopAll() error {
 // MStreamPersist ...
 func (c *ApiClient) MStreamPersist(dirPath, filePrefix string) error {
 	persist := &mstream.Persist{
-		Dir: dirPath,
+		Dir:        dirPath,
 		FilePrefix: filePrefix,
 	}
 	r, err := req.Post(fmt.Sprintf("%s/persist", c.MStreamApiPrefix), req.BodyJSON(persist))

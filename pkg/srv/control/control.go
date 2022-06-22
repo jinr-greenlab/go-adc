@@ -33,15 +33,15 @@ import (
 )
 
 const (
-	RegPort = 33300
+	RegPort         = 33300
 	RegReadInterval = 30
 )
 
 type ControlServer struct {
 	srv.Server
-	seq uint16
-	state ifc.State
-	api ifc.ApiServer
+	seq     uint16
+	state   ifc.State
+	api     ifc.ApiServer
 	devices map[string]*pkgdevice.Device
 }
 
@@ -69,7 +69,7 @@ func NewControlServer(ctx context.Context, cfg *config.Config) (ifc.ControlServe
 			ChIn:    make(chan srv.InPacket),
 			ChOut:   make(chan srv.OutPacket),
 		},
-		seq: 0,
+		seq:   0,
 		state: state,
 	}
 
@@ -126,9 +126,9 @@ func (s *ControlServer) Run() error {
 			}
 
 			captureInfo := gopacket.CaptureInfo{
-				Length: length,
+				Length:        length,
 				CaptureLength: length,
-				Timestamp: time.Now(),
+				Timestamp:     time.Now(),
 				AncillaryData: []interface{}{udpAddr, device.Name},
 			}
 			packet := srv.InPacket{CaptureInfo: captureInfo, Data: make([]byte, length)}
@@ -149,7 +149,7 @@ func (s *ControlServer) Run() error {
 			log.Debug("Recieved packet from device: %s packet: %s", deviceName, hex.EncodeToString(packet.Data()))
 			log.Debug(packet.Dump())
 			device, ok := s.devices[deviceName]
-			if ! ok {
+			if !ok {
 				log.Error("Packet unknown device: %s", deviceName)
 				continue
 			}
@@ -207,7 +207,6 @@ func (s *ControlServer) Run() error {
 		}
 	}()
 
-
 	select {
 	case <-s.Context.Done():
 		return s.Context.Err()
@@ -218,7 +217,9 @@ func (s *ControlServer) Run() error {
 
 // NextSeq ...
 func (s *ControlServer) NextSeq() uint16 {
-	seq := s.seq; s.seq++; return seq
+	seq := s.seq
+	s.seq++
+	return seq
 }
 
 // RegRequest ...
@@ -234,7 +235,7 @@ func (s *ControlServer) RegRequest(ops []*layers.RegOp, IP *net.IP) error {
 	}
 	log.Debug("Put Reg request to queue: udpaddr: %s request: %s", udpAddr, hex.EncodeToString(bytes))
 	s.ChOut <- srv.OutPacket{
-		Data: bytes,
+		Data:    bytes,
 		UDPAddr: udpAddr,
 	}
 	return nil
@@ -252,7 +253,7 @@ func (s *ControlServer) MemRequest(op *layers.MemOp, IP *net.IP) error {
 		return err
 	}
 	s.ChOut <- srv.OutPacket{
-		Data: bytes,
+		Data:    bytes,
 		UDPAddr: udpAddr,
 	}
 	return nil
@@ -261,7 +262,7 @@ func (s *ControlServer) MemRequest(op *layers.MemOp, IP *net.IP) error {
 // GetDeviceByName ...
 func (s *ControlServer) GetDeviceByName(deviceName string) (deviceifc.Device, error) {
 	device, ok := s.devices[deviceName]
-	if ! ok {
+	if !ok {
 		return nil, srv.ErrDeviceNotFound{What: deviceName}
 	}
 	return device, nil
@@ -293,4 +294,3 @@ func (s *ControlServer) MemRequestByDeviceName(op *layers.MemOp, deviceName stri
 	}
 	return s.MemRequest(op, device.IP)
 }
-

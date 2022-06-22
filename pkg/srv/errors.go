@@ -19,7 +19,7 @@ import (
 )
 
 // ErrGetAddr returned when we can not get the address and port of the device that sent a packet
-type ErrGetAddr struct {}
+type ErrGetAddr struct{}
 
 func (e ErrGetAddr) Error() string {
 	return fmt.Sprintf("Error while getting device address and port")

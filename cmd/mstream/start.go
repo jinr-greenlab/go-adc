@@ -33,8 +33,8 @@ func NewStartCommand() *cobra.Command {
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "start",
-		Short:         "Start MStream server",
+		Use:   "start",
+		Short: "Start MStream server",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if ip != "" {
 				parsedIP := net.ParseIP(ip)

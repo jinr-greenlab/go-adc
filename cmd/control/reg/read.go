@@ -27,8 +27,8 @@ func NewReadCommand() *cobra.Command {
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "read",
-		Short:         "Read value from register",
+		Use:   "read",
+		Short: "Read value from register",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			apiClient := command.NewApiClient(cfg)
 			if addr != "" {

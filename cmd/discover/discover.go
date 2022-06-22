@@ -20,8 +20,8 @@ import (
 
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "discover",
-		Short:         "Discover subcommand",
+		Use:   "discover",
+		Short: "Discover subcommand",
 	}
 
 	cmd.AddCommand(NewStartCommand())

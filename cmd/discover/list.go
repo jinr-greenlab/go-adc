@@ -26,8 +26,8 @@ func NewListCommand() *cobra.Command {
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:           "list",
-		Short:         "List discovered devices",
+		Use:   "list",
+		Short: "List discovered devices",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			apiClient := command.NewApiClient(cfg)
 			devices, err := apiClient.ListDevices()
@@ -37,7 +37,7 @@ func NewListCommand() *cobra.Command {
 			for _, device := range devices {
 				fmt.Printf(device.String())
 				now := uint64(time.Now().UnixNano()) * uint64(time.Nanosecond) / uint64(time.Millisecond)
-				if now - device.Timestamp > 3000 {
+				if now-device.Timestamp > 3000 {
 					fmt.Printf("~~~ Device is offline ~~~\n")
 				}
 			}

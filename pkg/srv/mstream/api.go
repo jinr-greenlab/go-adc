@@ -15,13 +15,13 @@
 // go-adc64 API
 //
 // RESTful APIs to interact with go-adc64 server
-// 
+//
 // Terms Of Service:
 //
 //     Schemes: http
 //     Host: localhost:8003
 //     Version: 1.0.0
-//     Contact: 
+//     Contact:
 //
 //     Consumes:
 //     - application/json
@@ -59,23 +59,23 @@ const (
 // Success response
 // swagger:response okResp
 type RespOk struct {
-   // in:body
-   Body struct {
-      // HTTP status code 200 - OK
-      Code int `json:"code"`
-   }
-}// Error Bad Request
+	// in:body
+	Body struct {
+		// HTTP status code 200 - OK
+		Code int `json:"code"`
+	}
+} // Error Bad Request
 // swagger:response badReq
 type ReqBadRequest struct {
-   // in:body
-   Body struct {
-      // HTTP status code 400 -  Bad Request
-      Code int `json:"code"`
-   }
+	// in:body
+	Body struct {
+		// HTTP status code 400 -  Bad Request
+		Code int `json:"code"`
+	}
 }
 
 type Persist struct {
-	Dir string
+	Dir        string
 	FilePrefix string
 }
 
@@ -91,7 +91,7 @@ func NewApiServer(ctx context.Context, cfg *config.Config, mstream *MStreamServe
 
 	s := &ApiServer{
 		Context: ctx,
-		Config: cfg,
+		Config:  cfg,
 		mstream: mstream,
 	}
 	return s, nil
@@ -111,37 +111,37 @@ func (s *ApiServer) Run() error {
 func (s *ApiServer) configureRouter() {
 	s.Router = mux.NewRouter()
 	subRouter := s.Router.PathPrefix("/api").Subrouter()
-  // swagger:operation POST /persist mstream getMstream
-  // ---
-  // summary: checks if mstream persist
-  // description: --
-  // responses:
-  //   "200":
-  //     "$ref": "#/responses/okResp"
-  //   "400":
-  //     "$ref": "#/responses/badReq"
+	// swagger:operation POST /persist mstream getMstream
+	// ---
+	// summary: checks if mstream persist
+	// description: --
+	// responses:
+	//   "200":
+	//     "$ref": "#/responses/okResp"
+	//   "400":
+	//     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/persist", s.handlePersist()).Methods("POST")
-  // swagger:operation GET /flush mstream getFlush
-  // ---
-  // summary: flush mstream
-  // description: --
-  // responses:
-  //   "200":
-  //     "$ref": "#/responses/okResp"
-  //   "400":
-  //     "$ref": "#/responses/badReq"
+	// swagger:operation GET /flush mstream getFlush
+	// ---
+	// summary: flush mstream
+	// description: --
+	// responses:
+	//   "200":
+	//     "$ref": "#/responses/okResp"
+	//   "400":
+	//     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/flush", s.handleFlush()).Methods("GET")
-  // swagger:operation GET /connect_to_devices mstream getConnect
-  // ---
-  // summary: connects mstream to adc boards
-  // description: --
-  // responses:
-  //   "200":
-  //     "$ref": "#/responses/okResp"
-  //   "400":
-  //     "$ref": "#/responses/badReq"
+	// swagger:operation GET /connect_to_devices mstream getConnect
+	// ---
+	// summary: connects mstream to adc boards
+	// description: --
+	// responses:
+	//   "200":
+	//     "$ref": "#/responses/okResp"
+	//   "400":
+	//     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/connect_to_devices", s.handleConnectToDevices()).Methods("GET")
-  s.Router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", http.FileServer(http.Dir("./swaggerui/"))))
+	s.Router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", http.FileServer(http.Dir("./swaggerui/"))))
 
 }
 

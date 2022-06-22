@@ -20,11 +20,10 @@ import (
 
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "config",
-		Short:         "Config subcommands",
+		Use:   "config",
+		Short: "Config subcommands",
 	}
 	cmd.AddCommand(NewInitCommand())
 
 	return cmd
 }
-
