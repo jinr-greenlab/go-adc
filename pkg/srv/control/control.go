@@ -18,13 +18,15 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"github.com/google/gopacket"
-	pkgdevice "jinr.ru/greenlab/go-adc/pkg/device"
-	deviceifc "jinr.ru/greenlab/go-adc/pkg/device/ifc"
-	"jinr.ru/greenlab/go-adc/pkg/srv/control/ifc"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/google/gopacket"
+
+	pkgdevice "jinr.ru/greenlab/go-adc/pkg/device"
+	deviceifc "jinr.ru/greenlab/go-adc/pkg/device/ifc"
+	"jinr.ru/greenlab/go-adc/pkg/srv/control/ifc"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
@@ -75,8 +77,8 @@ func NewControlServer(ctx context.Context, cfg *config.Config) (ifc.ControlServe
 
 	devices := make(map[string]*pkgdevice.Device)
 	for _, cfgDevice := range cfg.Devices {
-		device, err := pkgdevice.NewDevice(cfgDevice, s, state)
-		if err != nil {
+		device, newdevErr := pkgdevice.NewDevice(cfgDevice, s, state)
+		if newdevErr != nil {
 			return nil, err
 		}
 		devices[cfgDevice.Name] = device
@@ -119,8 +121,8 @@ func (s *ControlServer) Run() error {
 			}
 			log.Debug("Received packet from %s", udpAddr)
 			ipAddr := net.ParseIP(strings.Split(addr.String(), ":")[0])
-			device, err := s.GetDeviceByIP(ipAddr)
-			if err != nil {
+			device, getdevErr := s.GetDeviceByIP(ipAddr)
+			if getdevErr != nil {
 				log.Debug("Drop packet. Device not found for given IP: %s ", ipAddr.String())
 				continue
 			}
@@ -146,7 +148,7 @@ func (s *ControlServer) Run() error {
 				log.Error(packetErr.Error())
 				continue
 			}
-			log.Debug("Recieved packet from device: %s packet: %s", deviceName, hex.EncodeToString(packet.Data()))
+			log.Debug("Received packet from device: %s packet: %s", deviceName, hex.EncodeToString(packet.Data()))
 			log.Debug(packet.Dump())
 			device, ok := s.devices[deviceName]
 			if !ok {
@@ -161,8 +163,8 @@ func (s *ControlServer) Run() error {
 					continue
 				}
 				for _, op := range layer.RegOps {
-					err := device.UpdateReg(op.Reg)
-					if err != nil {
+					upregErr := device.UpdateReg(op.Reg)
+					if upregErr != nil {
 						log.Error("Fail to update device: device = %s", deviceName)
 						continue
 					}
@@ -198,8 +200,8 @@ func (s *ControlServer) Run() error {
 				ops = append(ops, &layers.RegOp{Read: true, Reg: &layers.Reg{Addr: addr}})
 			}
 			for _, device := range s.devices {
-				err := s.RegRequest(ops, device.IP)
-				if err != nil {
+				regreqErr := s.RegRequest(ops, device.IP)
+				if regreqErr != nil {
 					log.Error("Error while sending reg request to device %s", device.IP)
 				}
 			}
@@ -223,8 +225,8 @@ func (s *ControlServer) NextSeq() uint16 {
 }
 
 // RegRequest ...
-func (s *ControlServer) RegRequest(ops []*layers.RegOp, IP *net.IP) error {
-	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", IP, RegPort))
+func (s *ControlServer) RegRequest(ops []*layers.RegOp, ip *net.IP) error {
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", ip, RegPort))
 	if err != nil {
 		return err
 	}
@@ -242,8 +244,8 @@ func (s *ControlServer) RegRequest(ops []*layers.RegOp, IP *net.IP) error {
 }
 
 // MemRequest ...
-func (s *ControlServer) MemRequest(op *layers.MemOp, IP *net.IP) error {
-	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", IP, RegPort))
+func (s *ControlServer) MemRequest(op *layers.MemOp, ip *net.IP) error {
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", ip, RegPort))
 	if err != nil {
 		return err
 	}

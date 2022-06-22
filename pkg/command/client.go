@@ -17,7 +17,9 @@ package command
 import (
 	"errors"
 	"fmt"
+
 	"github.com/imroc/req"
+
 	"jinr.ru/greenlab/go-adc/pkg/command/ifc"
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/layers"

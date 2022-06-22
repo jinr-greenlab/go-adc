@@ -1,4 +1,4 @@
-.PHONY: build docker-build
+.PHONY: build docker-build swagger
 
 build:
 	mkdir -p bin
@@ -17,3 +17,20 @@ docker-build:
 #	docker tag go-adc:latest ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
 #	@echo docker push ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
 	@echo docker push ${DOCKER_IMAGE}:latest
+
+# linting
+LINTER              := golangci-lint
+LINTER_CONFIG       := .golangci.yaml
+
+# Our primary linter (golangci-lint) uses an embedded variant golint. This
+# embedded version will catch the most egregious of the issues that the
+# standard golint will catch, but it will fail to catch missing documentation.
+# The purpose of this script is to produce a nonzero return code if the
+# standard golint detects any issues.
+.PHONY: lint
+lint:
+lint:
+	$(LINTER) run --config $(LINTER_CONFIG)
+	@git --no-pager show --check
+#	@./tools/golint
+

@@ -17,9 +17,10 @@ package discover
 import (
 	"context"
 	"fmt"
-	"jinr.ru/greenlab/go-adc/pkg/config"
 	"net"
 	"time"
+
+	"jinr.ru/greenlab/go-adc/pkg/config"
 
 	"github.com/google/gopacket"
 	gopacketlayers "github.com/google/gopacket/layers"
@@ -88,7 +89,6 @@ func NewDiscoverServer(ctx context.Context, cfg *config.Config) (*DiscoverServer
 }
 
 func (s *DiscoverServer) Run() error {
-
 	conn, err := net.ListenMulticastUDP("udp", s.Interface, s.UDPAddr)
 	if err != nil {
 		return err
@@ -148,11 +148,11 @@ func (s *DiscoverServer) Run() error {
 				dd.SetSource(udpAddr)
 				dd.SetTimestamp()
 
-				if err := s.state.CreateBucket(BucketName(dd.SerialNumber)); err != nil {
+				if createBucketErr := s.state.CreateBucket(BucketName(dd.SerialNumber)); createBucketErr != nil {
 					log.Error("Error while creating bucket: device: %s", dd.SerialNumber)
 					continue
 				}
-				if err := s.state.SetDeviceDescription(dd); err != nil {
+				if setdevErr := s.state.SetDeviceDescription(dd); setdevErr != nil {
 					log.Error("Error while updating device description: device: %s error: %s", dd.SerialNumber, err)
 					continue
 				}
@@ -170,5 +170,4 @@ func (s *DiscoverServer) Run() error {
 	case err = <-errChan:
 		return err
 	}
-
 }

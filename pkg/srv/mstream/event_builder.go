@@ -16,6 +16,7 @@ package mstream
 
 import (
 	"github.com/google/gopacket"
+
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 	"jinr.ru/greenlab/go-adc/pkg/srv"
@@ -94,9 +95,9 @@ func (b *EventBuilder) CloseEvent() {
 		log.Error("Can not close event w/o trigger")
 		return
 	}
-	//log.Info("Close event: manager: %s builder: %d event: %d\n" +
-	//	"Data    channels: %064b\n" +
-	//	"Trigger channels: %064b", b.ManagerId, b.Id, b.EventNum, b.DataChannels, b.TriggerChannels)
+	log.Info("Close event: manager: %s builder: %d event: %d\n"+
+		"Data    channels: %064b\n"+
+		"Trigger channels: %064b", b.ManagerId, b.Id, b.EventNum, b.DataChannels, b.TriggerChannels)
 	dataCount := countDataFragments(b.DataChannels)
 	// Total data length is the total length of all data fragments + total length of all MpdMStreamHeader headers
 	// data length + (num data fragments + one trigger fragment) * MStream header size
@@ -171,17 +172,17 @@ func (b *EventBuilder) Run() {
 	for {
 		f := <-b.FragmentCh
 		if f.MStreamPayloadHeader.EventNum >= b.EventNum+NumEventBuilders {
-			//log.Info("Force close event: " +
-			//	"%s %d " +
-			//	"builder event: %d " +
-			//	"fragment event: %d",
-			//	b.ManagerId, b.Id, b.EventNum, f.MStreamPayloadHeader.EventNum)
+			log.Info("Force close event: "+
+				"%s %d "+
+				"builder event: %d "+
+				"fragment event: %d",
+				b.ManagerId, b.Id, b.EventNum, f.MStreamPayloadHeader.EventNum)
 			b.CloseEvent()
 			b.EventNum = <-b.seq
-			//log.Info("Change event number: manager: %s builder: %d event: %d", b.ManagerId, b.Id, b.EventNum)
+			log.Info("Change event number: manager: %s builder: %d event: %d", b.ManagerId, b.Id, b.EventNum)
 		}
 		if f.MStreamPayloadHeader.EventNum == b.EventNum {
-			//log.Info("Setting event fragment: %s %d event: %d", b.ManagerId, b.Id, f.MStreamPayloadHeader.EventNum)
+			log.Info("Setting event fragment: %s %d event: %d", b.ManagerId, b.Id, f.MStreamPayloadHeader.EventNum)
 			b.SetFragment(f)
 		}
 	}
@@ -230,23 +231,10 @@ func (m *EventBuilderManager) Run() {
 		}()
 	}
 
-	//go func() {
-	//	for {
-	//		f := <- m.fragmentCh
-	//		for _, b := range m.eventBuilders {
-	//			b.FragmentCh <- f
-	//		}
-	//	}
-	//}()
-
 	for {
 		f := <-m.fragmentCh
 		for _, b := range m.eventBuilders {
 			b.FragmentCh <- f
 		}
 	}
-	//select {
-	//case <- m.exitCh:
-	//	return
-	//}
 }

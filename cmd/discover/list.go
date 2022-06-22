@@ -16,10 +16,12 @@ package discover
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/spf13/cobra"
+
 	"jinr.ru/greenlab/go-adc/pkg/command"
 	"jinr.ru/greenlab/go-adc/pkg/config"
-	"time"
 )
 
 func NewListCommand() *cobra.Command {

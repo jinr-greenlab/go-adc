@@ -16,8 +16,9 @@ package main
 
 import (
 	"fmt"
-	"jinr.ru/greenlab/go-adc/cmd"
 	"os"
+
+	"jinr.ru/greenlab/go-adc/cmd"
 )
 
 func main() {

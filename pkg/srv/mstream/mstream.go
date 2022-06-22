@@ -16,6 +16,7 @@ package mstream
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -88,7 +89,6 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 }
 
 func (s *MStreamServer) Run() error {
-
 	conn, err := net.ListenUDP("udp", s.UDPAddr)
 	if err != nil {
 		return err
@@ -116,8 +116,8 @@ func (s *MStreamServer) Run() error {
 			}
 			log.Debug("Received packet from %s", udpAddr)
 			ipAddr := net.ParseIP(strings.Split(addr.String(), ":")[0])
-			device, err := s.GetDeviceByIP(ipAddr)
-			if err != nil {
+			device, getdevErr := s.GetDeviceByIP(ipAddr)
+			if getdevErr != nil {
 				log.Debug("Drop packet. Device not found for given IP: %s ", ipAddr.String())
 				continue
 			}
@@ -138,7 +138,7 @@ func (s *MStreamServer) Run() error {
 	go func() {
 		for {
 			outPacket := <-s.ChOut
-			//log.Info("Sending packet to %s data: \n%s", outPacket.UDPAddr, hex.EncodeToString(outPacket.Data))
+			log.Info("Sending packet to %s data: \n%s", outPacket.UDPAddr, hex.EncodeToString(outPacket.Data))
 			_, sendErr := conn.WriteToUDP(outPacket.Data, outPacket.UDPAddr)
 			if sendErr != nil {
 				log.Error("Error while sending data to %s", outPacket.UDPAddr)
@@ -158,8 +158,6 @@ func (s *MStreamServer) Run() error {
 			s.writerChs[device.Name],
 			exitEventBuilderManager,
 		)
-		//fragmentBuilderManager := layers.NewFragmentBuilderManager(device.Name, s.fragmentChs[device.Name])
-		//fragmentBuilderManager.Init()
 
 		// Run mpd writers
 		go func() {
@@ -175,22 +173,20 @@ func (s *MStreamServer) Run() error {
 					if filename == "" {
 						s.writers[device.Name] = io.Discard
 					} else {
-						w, err := NewWriter(filename)
-						if err != nil {
+						w, newWriterErr := NewWriter(filename)
+						if newWriterErr != nil {
 							log.Error("Error while creating writer: %s", err)
 							continue
 						}
 						s.writers[device.Name] = w
-						//fragmentBuilderManager.Init()
-						//exitEventBuilderManager <- true
 					}
 					currentFilename = filename
 				default:
 				}
 				select {
 				case bytes := <-s.writerChs[device.Name]:
-					_, err := s.writers[device.Name].Write(bytes)
-					if err != nil {
+					_, writeErr := s.writers[device.Name].Write(bytes)
+					if writeErr != nil {
 						log.Error("Error while writing to file: %s", err)
 					}
 				default:
@@ -206,7 +202,6 @@ func (s *MStreamServer) Run() error {
 
 		// Run parsers
 		go func() {
-
 			fragmentBuilderManager := layers.NewFragmentBuilderManager(device.Name, s.fragmentChs[device.Name])
 			fragmentBuilderManager.Init()
 
@@ -223,32 +218,31 @@ func (s *MStreamServer) Run() error {
 					log.Debug("MStream frame successfully parsed")
 					ms := mstreamLayer.(*layers.MStreamLayer)
 
-					udpaddr, err := srv.GetAddrPort(packet)
-					if err != nil {
+					udpaddr, getAddrErr := srv.GetAddrPort(packet)
+					if getAddrErr != nil {
 						log.Error("Error while getting udpaddr for a packet from input queue")
 						continue
 					}
 
 					for _, f := range ms.Fragments {
-						//log.Info("Handling fragment: FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t",
-						//	f.FragmentID, f.FragmentOffset, f.LastFragment())
+						log.Info("Handling fragment: FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t",
+							f.FragmentID, f.FragmentOffset, f.LastFragment())
 
-						err := s.SendAck(0, mlSeq, f.FragmentID, f.FragmentOffset, udpaddr)
-						if err != nil {
+						ackErr := s.SendAck(0, mlSeq, f.FragmentID, f.FragmentOffset, udpaddr)
+						if ackErr != nil {
 							log.Error("Error while sending Ack for fragment: ID: %d Offset: %d Length: %d",
 								f.FragmentID, f.FragmentOffset, f.FragmentLength)
 						}
 
-						//if f.Subtype == layers.MStreamTriggerSubtype && !f.LastFragment() {
-						//	log.Error("!!! Something really bad is happening. Trigger data is fragmented.")
-						//	continue
-						//}
+						if f.Subtype == layers.MStreamTriggerSubtype && !f.LastFragment() {
+							log.Error("!!! Something really bad is happening. Trigger data is fragmented.")
+							continue
+						}
 						fragmentBuilderManager.SetFragment(f)
 					}
 				}
 			}
 		}()
-
 	}
 
 	go func() {
@@ -303,8 +297,8 @@ func (s *MStreamServer) SendAck(src, seq, fragmentID, fragmentOffset uint16, udp
 		return err
 	}
 
-	//log.Debug("Put MStream Ack to output queue: udpaddr: %s ack: %s", udpAddr, hex.EncodeToString(buf.Bytes()))
-	//log.Info("Put MStream ack to output queue: udpaddr: %s fragment: %d", udpAddr, fragmentID)
+	log.Debug("Put MStream Ack to output queue: udpaddr: %s ack: %s", udpAddr, hex.EncodeToString(buf.Bytes()))
+	log.Info("Put MStream ack to output queue: udpaddr: %s fragment: %d", udpAddr, fragmentID)
 	s.ChOut <- srv.OutPacket{
 		Data:    buf.Bytes(),
 		UDPAddr: udpAddr,

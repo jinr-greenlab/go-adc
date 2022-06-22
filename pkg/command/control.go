@@ -16,6 +16,7 @@ package command
 
 import (
 	"context"
+
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/srv/control"
 )

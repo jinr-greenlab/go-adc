@@ -16,8 +16,9 @@ package layers
 
 import (
 	"container/list"
-	"jinr.ru/greenlab/go-adc/pkg/log"
 	"sync"
+
+	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
 const (
@@ -68,7 +69,7 @@ func NewFragmentBuilder(mgr *FragmentBuilderManager, fragmentId uint16, closeCh 
 }
 
 func (b *FragmentBuilder) Clear() {
-	//log.Info("Clear fragment builder: %s %d", b.mgr.deviceName, b.FragmentID)
+	log.Info("Clear fragment builder: %s %d", b.mgr.deviceName, b.FragmentID)
 	b.Free = true
 	b.DeviceID = 0
 	b.Flags = 0
@@ -81,7 +82,7 @@ func (b *FragmentBuilder) Clear() {
 }
 
 func (b *FragmentBuilder) CloseFragment() {
-	//log.Info("Close fragment: %s %d", b.mgr.deviceName, b.FragmentID)
+	log.Info("Close fragment: %s %d", b.mgr.deviceName, b.FragmentID)
 	defer b.Clear()
 
 	var data []byte
@@ -157,8 +158,8 @@ func (b *FragmentBuilder) SetFragment(f *MStreamFragment) {
 	}
 	b.TotalLength += f.FragmentLength
 
-	//log.Debug("Fragment builder: %s %d state: count: %d highest: %d total: %d",
-	//	b.mgr.deviceName, b.FragmentID, b.Parts.Len(), b.Highest, b.TotalLength)
+	log.Debug("Fragment builder: %s %d state: count: %d highest: %d total: %d",
+		b.mgr.deviceName, b.FragmentID, b.Parts.Len(), b.Highest, b.TotalLength)
 
 	if f.LastFragment() {
 		b.LastFragmentReceived = true
@@ -167,7 +168,7 @@ func (b *FragmentBuilder) SetFragment(f *MStreamFragment) {
 	// Last fragment received and the total length of all fragments corresponds
 	// to the end of the last fragment which means there are no missing fragments.
 	if b.LastFragmentReceived && b.Highest == b.TotalLength {
-		//log.Info("Fragment completed: %s %d", b.mgr.deviceName, b.FragmentID)
+		log.Info("Fragment completed: %s %d", b.mgr.deviceName, b.FragmentID)
 		b.Completed = true
 	}
 
@@ -213,13 +214,13 @@ func (m *FragmentBuilderManager) GetLastClosedFragment() uint16 {
 }
 
 func (m *FragmentBuilderManager) SetLastClosedFragment(fragmentID uint16) {
-	//log.Info("Set last closed fragment: %s %d", m.deviceName, fragmentID)
+	log.Info("Set last closed fragment: %s %d", m.deviceName, fragmentID)
 	m.lastClosedFragment = fragmentID
 }
 
 func (m *FragmentBuilderManager) SetFragment(f *MStreamFragment) {
-	//log.Info("Setting fragment part: %s %d offset: %d length: %d last: %t",
-	//	m.deviceName, f.FragmentID, f.FragmentOffset, f.FragmentLength, f.LastFragment())
+	log.Info("Setting fragment part: %s %d offset: %d length: %d last: %t",
+		m.deviceName, f.FragmentID, f.FragmentOffset, f.FragmentLength, f.LastFragment())
 
 	m.fragmentBuilders[f.FragmentID].SetFragment(f)
 }
