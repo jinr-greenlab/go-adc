@@ -1,6 +1,6 @@
 module jinr.ru/greenlab/go-adc
 
-go 1.15
+go 1.16
 
 require (
 	github.com/google/gopacket v1.1.19

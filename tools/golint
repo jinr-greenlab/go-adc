@@ -21,4 +21,3 @@ if [[ -n "$issues" ]]; then
 fi
 # Revert changes made by 'go install' command
 git checkout go.mod go.sum
-
