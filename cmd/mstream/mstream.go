@@ -20,8 +20,8 @@ import (
 
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "mstream",
-		Short:         "MStream subcommand",
+		Use:   "mstream",
+		Short: "MStream subcommand",
 	}
 
 	cmd.AddCommand(NewStartCommand())

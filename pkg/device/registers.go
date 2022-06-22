@@ -16,7 +16,6 @@ package device
 
 type RegAlias int
 
-
 const (
 	RegDeviceCtrl RegAlias = iota
 	RegDeviceRlat
@@ -94,32 +93,32 @@ const (
 )
 
 const (
-	RegFirBase uint16 = 0x200
+	RegFirBase     uint16 = 0x200
 	RegTrigCsrBase uint16 = 0x240
 )
 
 // even more register addresses in mregdevice.h qtmregdevice.cpp
 var RegMap = map[RegAlias]uint16{
-	RegDeviceCtrl: 0x40,
-	RegDeviceRlat: 0x41,
-	RegRunStatus:  0x42,
-	RegDeviceId: 0x42,
-	RegTrigCtrl: 0x43,
-	RegAdcInfo: 0x44,
-	RegChDpmKs: 0x4A,
+	RegDeviceCtrl:   0x40,
+	RegDeviceRlat:   0x41,
+	RegRunStatus:    0x42,
+	RegDeviceId:     0x42,
+	RegTrigCtrl:     0x43,
+	RegAdcInfo:      0x44,
+	RegChDpmKs:      0x4A,
 	RegTemperature:  0x4B,
-	RegFwVer: 0x4C,
-	RegFwRev: 0x4D,
-	RegSerialNum: 0x4E,
-	RegDacMax5501: 0x100,
-	RegDacMax5502:  0x101,
-	RegPca12: 0x102,
-	RegAdcSpi: 0x160,
+	RegFwVer:        0x4C,
+	RegFwRev:        0x4D,
+	RegSerialNum:    0x4E,
+	RegDacMax5501:   0x100,
+	RegDacMax5502:   0x101,
+	RegPca12:        0x102,
+	RegAdcSpi:       0x160,
 	RegAdc12SpiRead: 0x161,
 	RegAdc34SpiRead: 0x162,
-	RegAdc56SpiRead:  0x163,
+	RegAdc56SpiRead: 0x163,
 	RegAdc78SpiRead: 0x164,
-	RegZsEvents: 0x110,
+	RegZsEvents:     0x110,
 	//RegLtm9011Spi1Addr: 0x160,
 	//RegLtm9011Spi1WrData: 0x161,
 	//RegLtm9011Spi2Addr:  0x168,
@@ -142,47 +141,46 @@ var RegMap = map[RegAlias]uint16{
 	//RegAd5622Command: 0x131,
 	//RegAd5622Baseline: 0x132,
 	//RegAd5622Level: 0x133,
-	RegMstreamRunCtrl:  0x140,
-	RegMstreamDataSizeBytes: 0x141,
+	RegMstreamRunCtrl:          0x140,
+	RegMstreamDataSizeBytes:    0x141,
 	RegMstreamReadoutChannelEn: 0x142,
-	RegMstreamSparseCtrl: 0x148,
-	RegMstreamSparseOffset: 0x149,
-	RegMstreamSparsePeriod:  0x14A,
-	RegMstreamMtuSize: 0x14C,
-	RegDesCtrl: 0x150,
-	RegDesStatus: 0x151,
-	RegDesIdelayTapVal: 0x153,
-	RegDesIdelayLoadMask:  0x154,
+	RegMstreamSparseCtrl:       0x148,
+	RegMstreamSparseOffset:     0x149,
+	RegMstreamSparsePeriod:     0x14A,
+	RegMstreamMtuSize:          0x14C,
+	RegDesCtrl:                 0x150,
+	RegDesStatus:               0x151,
+	RegDesIdelayTapVal:         0x153,
+	RegDesIdelayLoadMask:       0x154,
 	//RegHmcad1101SpiBase: 0x160,
 	//RegHmcad1101SpiAddrReg: 0x168,
-	RegFirControl: RegFirBase + 0,
-	RegFirCoefCtrl: RegFirBase + 1,
-	RegFirRoundoff: RegFirBase + 2,
-	RegFirCoefStart: RegFirBase + 0x10,
-	RegTrigCsrTrigTs: RegTrigCsrBase + 0,
-	RegTrigCsrEvNum:  RegTrigCsrBase + 4,
-	RegTrigCsrTrigInDelay: RegTrigCsrBase + 8,
-	RegTrigCsrTrigCode: RegTrigCsrBase + 9,
-	RegStatisticControl: 0x300,
-	RegAdcStatus: 0x301,
-	RegRunEventNumber: 0x302,
-	RegWrSyncLostCounter:  0x304,
-	RegWrLinkErrorCounter: 0x306,
-	RegAdcStatusMask: 0x308,
+	RegFirControl:             RegFirBase + 0,
+	RegFirCoefCtrl:            RegFirBase + 1,
+	RegFirRoundoff:            RegFirBase + 2,
+	RegFirCoefStart:           RegFirBase + 0x10,
+	RegTrigCsrTrigTs:          RegTrigCsrBase + 0,
+	RegTrigCsrEvNum:           RegTrigCsrBase + 4,
+	RegTrigCsrTrigInDelay:     RegTrigCsrBase + 8,
+	RegTrigCsrTrigCode:        RegTrigCsrBase + 9,
+	RegStatisticControl:       0x300,
+	RegAdcStatus:              0x301,
+	RegRunEventNumber:         0x302,
+	RegWrSyncLostCounter:      0x304,
+	RegWrLinkErrorCounter:     0x306,
+	RegAdcStatusMask:          0x308,
 	RegTrigOnXoffErrorCounter: 0x30A,
-	RegRunEventNumber64: 0x30C,
-	RegAdcTimeSec:  0x1000,
+	RegRunEventNumber64:       0x30C,
+	RegAdcTimeSec:             0x1000,
 }
-
 
 const (
 	RegRunStatusBitRunning uint16 = 0x0010
 )
 
 const (
-  RegTrigStatusBitTimer uint16 = 0x001
-  RegTrigStatusBitThreshold uint16 = 0x002
-  RegTrigStatusBitLemo uint16 = 0x004
+	RegTrigStatusBitTimer     uint16 = 0x001
+	RegTrigStatusBitThreshold uint16 = 0x002
+	RegTrigStatusBitLemo      uint16 = 0x004
 )
 
 type MemAlias int
@@ -206,23 +204,22 @@ const (
 )
 
 var MemMap = map[MemAlias]uint32{
-	MemChWrAddr: 0x0000,
-	MemChCtrl: 0x0001,
-	MemChThr: 0x0002,
-	MemChZsThr: 0x0003,
-	MemChBaseline: 0x0004,
-	MemChAdcData: 0x0005,
-	MemChAdcPattern: 0x0006,
+	MemChWrAddr:                0x0000,
+	MemChCtrl:                  0x0001,
+	MemChThr:                   0x0002,
+	MemChZsThr:                 0x0003,
+	MemChBaseline:              0x0004,
+	MemChAdcData:               0x0005,
+	MemChAdcPattern:            0x0006,
 	MemChAdcPatternMismatchCnt: 0x0007,
-	MemChBlcThrHi: 0x0008,
-	MemChBlcThrLo: 0x0009,
-	MemChD2Hist: 0x0080,
-	MemChD2HistCtrl: 0x00C0,
-	MemChD2HistSt: 0x00C1,
-	MemChD2HistTime: 0x00C2,
+	MemChBlcThrHi:              0x0008,
+	MemChBlcThrLo:              0x0009,
+	MemChD2Hist:                0x0080,
+	MemChD2HistCtrl:            0x00C0,
+	MemChD2HistSt:              0x00C1,
+	MemChD2HistTime:            0x00C2,
 }
 
 const (
 	MemBitSelectCtrl = 1 << 13 // bit13==1 (bus 15:0) - register operation
 )
-

@@ -24,11 +24,11 @@ import (
 type LogLevel int
 
 const (
-	LogPrefix = "[go-adc] "
-	ErrorPrefix = "[error] "
-	WarningPrefix = "[warn] "
-	InfoPrefix = "[info] "
-	DebugPrefix = "[debug] "
+	LogPrefix       = "[go-adc] "
+	ErrorPrefix     = "[error] "
+	WarningPrefix   = "[warn] "
+	InfoPrefix      = "[info] "
+	DebugPrefix     = "[debug] "
 	DefaultLogLevel = InfoLevel
 )
 
@@ -44,7 +44,7 @@ type Logger struct {
 	*log.Logger
 }
 
-var	logger = &Logger{
+var logger = &Logger{
 	level:  DefaultLogLevel,
 	Logger: log.New(os.Stderr, LogPrefix, log.LstdFlags),
 }
@@ -55,24 +55,24 @@ func Init(out io.Writer) {
 
 func Error(format string, v ...interface{}) {
 	if logger.level >= ErrorLevel {
-		logger.Println(fmt.Sprintf(ErrorPrefix + format, v...))
+		logger.Println(fmt.Sprintf(ErrorPrefix+format, v...))
 	}
 }
 
 func Warning(format string, v ...interface{}) {
 	if logger.level >= WarningLevel {
-		logger.Println(fmt.Sprintf(WarningPrefix + format, v...))
+		logger.Println(fmt.Sprintf(WarningPrefix+format, v...))
 	}
 }
 
 func Info(format string, v ...interface{}) {
 	if logger.level >= InfoLevel {
-		logger.Println(fmt.Sprintf(InfoPrefix + format, v...))
+		logger.Println(fmt.Sprintf(InfoPrefix+format, v...))
 	}
 }
 
 func Debug(format string, v ...interface{}) {
 	if logger.level >= DebugLevel {
-		logger.Println(fmt.Sprintf(DebugPrefix + format, v...))
+		logger.Println(fmt.Sprintf(DebugPrefix+format, v...))
 	}
 }

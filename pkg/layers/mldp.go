@@ -35,12 +35,12 @@ const (
 )
 
 const (
-	LLDPTIASubtypeIgnore uint8 = 1
-	LLDPTIASubtypeHW uint8 = 5
-	LLDPTIASubtypeFW uint8 = 6
-	LLDPTIASubtypeSerial uint8 = 8
+	LLDPTIASubtypeIgnore       uint8 = 1
+	LLDPTIASubtypeHW           uint8 = 5
+	LLDPTIASubtypeFW           uint8 = 6
+	LLDPTIASubtypeSerial       uint8 = 8
 	LLDPTIASubtypeManufacturer uint8 = 9
-	LLDPTIASubtypeModel uint8 = 10
+	LLDPTIASubtypeModel        uint8 = 10
 )
 
 const (
@@ -49,9 +49,9 @@ const (
 )
 
 type Flags struct {
-	MasterLocked uint8 `json:"masterLocked"`
+	MasterLocked  uint8 `json:"masterLocked"`
 	MStreamLocked uint8 `json:"mstreamLocked"`
-	Unused uint8 `json:"unused"`
+	Unused        uint8 `json:"unused"`
 }
 
 type Mac struct {
@@ -89,25 +89,25 @@ func (d *DeviceID) UnmarshalJSON(bytes []byte) error {
 }
 
 type DeviceDescription struct {
-	DeviceID DeviceID `json:"deviceID,omitempty"`
-	SerialID uint64 `json:"serialID,omitempty"`
-	ChassisSlot uint16 `json:"chassisSlot,omitempty"`
-	MasterMac Mac `json:"masterMac"`
-	MasterIP net.IP `json:"masterIP"`
-	MasterUDPPort uint16 `json:"masterUDPPort"`
-	MStreamMac Mac `json:"mstreamMac"`
-	MStreamIP net.IP `json:"mstreamIP"`
-	MStreamUDPPort uint16 `json:"mstreamUDPPort"`
-	Flags `json:"flags,omitempty"`
+	DeviceID       DeviceID `json:"deviceID,omitempty"`
+	SerialID       uint64   `json:"serialID,omitempty"`
+	ChassisSlot    uint16   `json:"chassisSlot,omitempty"`
+	MasterMac      Mac      `json:"masterMac"`
+	MasterIP       net.IP   `json:"masterIP"`
+	MasterUDPPort  uint16   `json:"masterUDPPort"`
+	MStreamMac     Mac      `json:"mstreamMac"`
+	MStreamIP      net.IP   `json:"mstreamIP"`
+	MStreamUDPPort uint16   `json:"mstreamUDPPort"`
+	Flags          `json:"flags,omitempty"`
 
 	HardwareRevision string `json:"hardwareRevision,omitempty"`
 	FirmwareRevision string `json:"firmwareRevision,omitempty"`
-	SerialNumber string `json:"serialNumber,omitempty"`
+	SerialNumber     string `json:"serialNumber,omitempty"`
 	ManufacturerName string `json:"manufacturerName,omitempty"`
-	ModelName string `json:"modelName,omitempty"`
-	Address net.IP `json:"address"`
-	Port uint16 `json:"port"`
-	Timestamp uint64 `json:"timestamp,omitempty"`
+	ModelName        string `json:"modelName,omitempty"`
+	Address          net.IP `json:"address"`
+	Port             uint16 `json:"port"`
+	Timestamp        uint64 `json:"timestamp,omitempty"`
 }
 
 func (dd *DeviceDescription) SetSource(udpAddr *net.UDPAddr) error {
@@ -195,4 +195,3 @@ func DecodeOrgSpecific(tlvs []layers.LLDPOrgSpecificTLV, dd *DeviceDescription) 
 		}
 	}
 }
-

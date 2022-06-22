@@ -26,9 +26,8 @@ import (
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
-
 const (
-	BucketPrefix = "discover_"
+	BucketPrefix         = "discover_"
 	DeviceDescriptionKey = "device_description"
 )
 
@@ -45,7 +44,7 @@ func NewState(ctx context.Context, cfg *config.Config) (*State, error) {
 	}
 	return &State{
 		Context: ctx,
-		DB: db,
+		DB:      db,
 	}, nil
 }
 
@@ -112,7 +111,7 @@ func (s *State) GetDeviceDescription(serialNumber string) (string, uint64, error
 		}
 		ddBytes := b.Get([]byte(DeviceDescriptionKey))
 		if ddBytes == nil {
-			return errors.New(fmt.Sprintf("Description not found", ))
+			return errors.New(fmt.Sprintf("Description not found"))
 		}
 		var dd *layers.DeviceDescription
 		if err := yaml.Unmarshal(ddBytes, dd); err != nil {
@@ -133,7 +132,7 @@ func (s *State) GetAllDeviceDescriptions() ([]*layers.DeviceDescription, error) 
 		tx.ForEach(func(_ []byte, b *bbolt.Bucket) error {
 			ddBytes := b.Get([]byte(DeviceDescriptionKey))
 			if ddBytes == nil {
-				return errors.New(fmt.Sprintf("Description not found", ))
+				return errors.New(fmt.Sprintf("Description not found"))
 			}
 			dd := &layers.DeviceDescription{}
 			if err := yaml.Unmarshal(ddBytes, dd); err != nil {
@@ -149,4 +148,3 @@ func (s *State) GetAllDeviceDescriptions() ([]*layers.DeviceDescription, error) 
 	}
 	return devices, nil
 }
-

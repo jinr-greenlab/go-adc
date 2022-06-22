@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	MLinkHostAddr = 1
+	MLinkHostAddr   = 1
 	MLinkDeviceAddr = 0xfefe
 )
 
@@ -59,10 +59,10 @@ type MLinkType uint16
 
 const (
 	// TODO add other MLink types once they are implemented
-	MLinkTypeMStream MLinkType = 0x5354
-	MLinkTypeRegRequest MLinkType = 0x0101
+	MLinkTypeMStream     MLinkType = 0x5354
+	MLinkTypeRegRequest  MLinkType = 0x0101
 	MLinkTypeRegResponse MLinkType = 0x0102
-	MLinkTypeMemRequest MLinkType = 0x0105
+	MLinkTypeMemRequest  MLinkType = 0x0105
 	MLinkTypeMemResponse MLinkType = 0x0106
 )
 
@@ -113,10 +113,10 @@ func (t MLinkType) String() string {
 type MLinkHeader struct {
 	Type MLinkType
 	Sync uint16
-	Seq uint16
-	Len uint16 // length of MLink frame including header, payload and CRC in 4-byte words NOT in bytes
-	Src uint16
-	Dst uint16
+	Seq  uint16
+	Len  uint16 // length of MLink frame including header, payload and CRC in 4-byte words NOT in bytes
+	Src  uint16
+	Dst  uint16
 }
 
 type MLinkLayer struct {
@@ -174,8 +174,8 @@ func (ml *MLinkLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) e
 	}
 
 	ml.BaseLayer = layers.BaseLayer{
-		Contents: data[0:12], // MLink header 12 bytes
-		Payload: data[12:len(data)-4], // data without MLink header and without CRC in the end of each MLink frame
+		Contents: data[0:12],             // MLink header 12 bytes
+		Payload:  data[12 : len(data)-4], // data without MLink header and without CRC in the end of each MLink frame
 	}
 
 	ml.Type = MLinkType(binary.LittleEndian.Uint16(data[0:2]))
@@ -190,7 +190,7 @@ func (ml *MLinkLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) e
 	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	// This check is only valid for MStream
 	if ml.Type == MLinkTypeMStream && ml.Crc != MLinkMStreamCRC {
-		msg := fmt.Sprintf( "Wrong MLink tail for MStream frame 0x%08x Must be 0x%08x", ml.Crc, MLinkMStreamCRC)
+		msg := fmt.Sprintf("Wrong MLink tail for MStream frame 0x%08x Must be 0x%08x", ml.Crc, MLinkMStreamCRC)
 		log.Error(msg)
 	}
 

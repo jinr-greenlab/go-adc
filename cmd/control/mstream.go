@@ -28,9 +28,9 @@ func NewMStreamCommand() *cobra.Command {
 	cfg := config.NewDefaultConfig()
 	cfg.Load()
 	cmd := &cobra.Command{
-		Use:    fmt.Sprintf("mstream start|stop"),
-		Short:  "Start/stop streaming for a device",
-		Args:   cobra.ExactArgs(1),
+		Use:       fmt.Sprintf("mstream start|stop"),
+		Short:     "Start/stop streaming for a device",
+		Args:      cobra.ExactArgs(1),
 		ValidArgs: []string{"start", "stop"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			apiClient := command.NewApiClient(cfg)

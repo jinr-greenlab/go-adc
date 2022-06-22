@@ -19,8 +19,8 @@ import (
 	"encoding/hex"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"sort"
 	"jinr.ru/greenlab/go-adc/pkg/log"
+	"sort"
 )
 
 const (
@@ -29,7 +29,7 @@ const (
 )
 
 const (
-	MpdSyncMagic = 0x2A502A50
+	MpdSyncMagic      = 0x2A502A50
 	MpdTimestampMagic = 0x3f60b8a8
 )
 
@@ -40,7 +40,7 @@ type MpdLayer struct {
 	*MpdEventHeader
 	*MpdDeviceHeader
 	Trigger *MStreamTrigger
-	Data map[ChannelNum]*MStreamData
+	Data    map[ChannelNum]*MStreamData
 }
 
 var MpdLayerType = gopacket.RegisterLayerType(MpdLayerNum,
@@ -55,30 +55,30 @@ func (ms *MpdLayer) LayerType() gopacket.LayerType {
 
 // MpdTimestampHeader ... // 16 bytes
 type MpdTimestampHeader struct {
-	Sync uint32
-	Length uint32
+	Sync      uint32
+	Length    uint32
 	Timestamp uint64
 }
 
 // MpdEventHeader ... 12 bytes
 type MpdEventHeader struct {
-	Sync uint32
+	Sync     uint32
 	EventNum uint32
-	Length uint32 // total length in bytes of all device event blocks
+	Length   uint32 // total length in bytes of all device event blocks
 }
 
 // MpdDeviceHeader ... 8 bytes
 type MpdDeviceHeader struct {
 	DeviceSerial uint32
-	DeviceID uint8
-	Length uint32 // 24 bits // total length in bytes of all mstream blocks
+	DeviceID     uint8
+	Length       uint32 // 24 bits // total length in bytes of all mstream blocks
 }
 
 // MpdMStreamHeader ... 4 bytes
 type MpdMStreamHeader struct {
-	Subtype // 2 bits 0-1
-	Length uint32 // 22 bits 2-23 // payload length in 32-bit words
-	ChannelNum // 8 bits 24-31
+	Subtype           // 2 bits 0-1
+	Length     uint32 // 22 bits 2-23 // payload length in 32-bit words
+	ChannelNum        // 8 bits 24-31
 }
 
 // Serialize MpdEventHeader
@@ -109,7 +109,7 @@ func (h *MpdDeviceHeader) Serialize(buf []byte) error {
 	log.Debug("MpdDeviceHeader.Serialize: DeviceID: %d", h.DeviceID)
 	log.Debug("MpdDeviceHeader.Serialize: Length: %d", h.Length)
 	binary.LittleEndian.PutUint32(buf[0:4], h.DeviceSerial)
-	binary.LittleEndian.PutUint16(buf[4:6], uint16(h.Length & 0xffff))
+	binary.LittleEndian.PutUint16(buf[4:6], uint16(h.Length&0xffff))
 	buf[6] = uint8((h.Length & 0xff0000) >> 4)
 	buf[7] = h.DeviceID
 	return nil
@@ -120,8 +120,8 @@ func (h *MpdMStreamHeader) Serialize(buf []byte) error {
 	log.Debug("MpdMStreamHeader.Serialize: Subtype: %d", h.Subtype)
 	log.Debug("MpdMStreamHeader.Serialize: Length: %d", h.Length)
 	log.Debug("MpdMStreamHeader.Serialize: ChannelNum: %d", h.ChannelNum)
-	buf[0] = uint8(h.Length << 2) | uint8(h.Subtype & 0x3)
-	binary.LittleEndian.PutUint16(buf[1:3], uint16(((h.Length << 2) & 0xffff00) >> 8))
+	buf[0] = uint8(h.Length<<2) | uint8(h.Subtype&0x3)
+	binary.LittleEndian.PutUint16(buf[1:3], uint16(((h.Length<<2)&0xffff00)>>8))
 	buf[3] = uint8(h.ChannelNum)
 	return nil
 }
@@ -154,8 +154,8 @@ func (mpd *MpdLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Seria
 		return err
 	}
 	triggerHeader := &MpdMStreamHeader{
-		Subtype: MStreamTriggerSubtype,
-		Length: 4,
+		Subtype:    MStreamTriggerSubtype,
+		Length:     4,
 		ChannelNum: 0,
 	}
 	triggerHeader.Serialize(triggerHeaderBytes)
@@ -179,8 +179,8 @@ func (mpd *MpdLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Seria
 			return err
 		}
 		header := &MpdMStreamHeader{
-			Subtype: MStreamDataSubtype,
-			Length: uint32(len(mpd.Data[c].Bytes) / 4),
+			Subtype:    MStreamDataSubtype,
+			Length:     uint32(len(mpd.Data[c].Bytes) / 4),
 			ChannelNum: c,
 		}
 		header.Serialize(headerBytes)

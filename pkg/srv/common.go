@@ -66,7 +66,7 @@ type Server struct {
 	context.Context
 	*config.Config
 	*net.UDPAddr
-	ChIn chan InPacket
+	ChIn  chan InPacket
 	ChOut chan OutPacket
 }
 

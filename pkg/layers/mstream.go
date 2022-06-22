@@ -44,17 +44,17 @@ type ChannelNum uint8
 type MStreamPayloadHeader struct {
 	DeviceSerial uint32
 	EventNum     uint32 // 24 bits
-	ChannelNum // for trigger it is always 0
+	ChannelNum          // for trigger it is always 0
 }
 
 // MStreamTrigger ... // 16 bytes
 type MStreamTrigger struct {
-	TaiSec uint32
-	Flags uint8 // 2 bits
+	TaiSec  uint32
+	Flags   uint8  // 2 bits
 	TaiNSec uint32 // 30 bits
 	// TODO: Put these two fields into one uint64
 	LowCh uint32
-	HiCh uint32
+	HiCh  uint32
 }
 
 // MStreamData ...
@@ -65,15 +65,15 @@ type MStreamData struct {
 // MStreamFragment ...
 type MStreamFragment struct {
 	FragmentLength uint16 // length of fragment payload NOT including MStream header in bytes
-	Subtype // 2 bits
-	Flags          uint8 // 6 bits
+	Subtype               // 2 bits
+	Flags          uint8  // 6 bits
 	// DeviceID is the ADC64 device model identifier
 	// 0xd9 for ADC64VE-XGE
 	// 0xdf for ADC64VE-V3-XG
 	DeviceID       uint8
 	FragmentID     uint16
 	FragmentOffset uint16
-	Data []byte
+	Data           []byte
 
 	*MStreamPayloadHeader
 	// Fragment contains either MStreamTrigger or MStreamData, not both of them at the same time
@@ -99,7 +99,7 @@ func (ms *MStreamLayer) LayerType() gopacket.LayerType {
 func (h *MStreamPayloadHeader) Serialize(buf []byte) error {
 	binary.LittleEndian.PutUint32(buf[0:4], h.DeviceSerial)
 	buf[4] = uint8(h.EventNum & 0xff)
-	binary.LittleEndian.PutUint16(buf[5:7], uint16((h.EventNum & 0xffff00) >> 8))
+	binary.LittleEndian.PutUint16(buf[5:7], uint16((h.EventNum&0xffff00)>>8))
 	buf[7] = uint8(h.ChannelNum)
 	return nil
 }
@@ -115,7 +115,7 @@ func (t *MStreamTrigger) Serialize(buf []byte) error {
 	//log.Debug("MStreamTrigger.Serialize: HiCh: %d", t.HiCh)
 
 	binary.LittleEndian.PutUint32(buf[0:4], t.TaiSec)
-	binary.LittleEndian.PutUint32(buf[4:8], (t.TaiNSec << 2 | uint32(t.Flags)))
+	binary.LittleEndian.PutUint32(buf[4:8], (t.TaiNSec<<2 | uint32(t.Flags)))
 	binary.LittleEndian.PutUint32(buf[8:12], t.LowCh)
 	binary.LittleEndian.PutUint32(buf[12:16], t.HiCh)
 	return nil
@@ -137,7 +137,7 @@ func (ms *MStreamLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Se
 		binary.LittleEndian.PutUint16(headerBytes[0:2], fragment.FragmentLength)
 		headerBytes[2] = (fragment.Flags << 2) | uint8(fragment.Subtype)
 		headerBytes[3] = fragment.DeviceID
-		binary.LittleEndian.PutUint32(headerBytes[4:8], (uint32(fragment.FragmentID) << 16) | uint32(fragment.FragmentOffset))
+		binary.LittleEndian.PutUint32(headerBytes[4:8], (uint32(fragment.FragmentID)<<16)|uint32(fragment.FragmentOffset))
 
 		payloadBytes, err := b.AppendBytes(int(fragment.FragmentLength))
 		if err != nil {
@@ -164,8 +164,8 @@ func DecodeMStreamPayloadHeader(fragmentPayload []byte) (*MStreamPayloadHeader, 
 
 	return &MStreamPayloadHeader{
 		DeviceSerial: binary.LittleEndian.Uint32(fragmentPayload[0:4]),
-		EventNum: binary.LittleEndian.Uint32(eventNumBytes),
-		ChannelNum: ChannelNum(fragmentPayload[7]),
+		EventNum:     binary.LittleEndian.Uint32(eventNumBytes),
+		ChannelNum:   ChannelNum(fragmentPayload[7]),
 	}, nil
 }
 
@@ -184,11 +184,11 @@ func DecodeMStreamTrigger(fragmentPayload []byte) (*MStreamTrigger, error) {
 	//log.Debug("DecodeMStreamTrigger: HiCh: %d", binary.LittleEndian.Uint32(fragmentPayload[20:24]))
 
 	return &MStreamTrigger{
-		TaiSec: binary.LittleEndian.Uint32(fragmentPayload[8:12]),
-		Flags: uint8(taiNSecFlags & 0x3),
+		TaiSec:  binary.LittleEndian.Uint32(fragmentPayload[8:12]),
+		Flags:   uint8(taiNSecFlags & 0x3),
 		TaiNSec: taiNSecFlags >> 2,
-		LowCh: binary.LittleEndian.Uint32(fragmentPayload[16:20]),
-		HiCh: binary.LittleEndian.Uint32(fragmentPayload[20:24]),
+		LowCh:   binary.LittleEndian.Uint32(fragmentPayload[16:20]),
+		HiCh:    binary.LittleEndian.Uint32(fragmentPayload[20:24]),
 	}, nil
 }
 
@@ -208,7 +208,7 @@ func (ms *MStreamLayer) DecodeFragment(offset int, data []byte) (int, error) {
 	//log.Debug("DecodeFragment: offset: %d", offset)
 
 	// Decoding fragment header
-	fragmentLength := binary.LittleEndian.Uint16(data[offset:offset + 2])
+	fragmentLength := binary.LittleEndian.Uint16(data[offset : offset+2])
 	if fragmentLength == 0 {
 		return offset, errors.New("Invalid MStream fragment: FragmentLength = 0")
 	}
@@ -217,11 +217,11 @@ func (ms *MStreamLayer) DecodeFragment(offset int, data []byte) (int, error) {
 	//log.Debug("DecodeFragment: newOffset: %d", newOffset)
 	//log.Debug("DecodeFragment: fragment data: \n%s", hex.Dump(data[offset:newOffset]))
 
-	subtype := data[offset + 2] & 0x3 // Subtype is two least significant bits
-	flags := (data[offset + 2] >> 2) & 0x3f // Flags is six high bits
-	deviceID := data[offset + 3]
-	fragmentOffsetID := binary.LittleEndian.Uint32(data[offset + 4:offset + 8])
-	fragmentID := uint16(fragmentOffsetID >> 16) // FragmentID takes 2 bytes for MStream 2.x
+	subtype := data[offset+2] & 0x3       // Subtype is two least significant bits
+	flags := (data[offset+2] >> 2) & 0x3f // Flags is six high bits
+	deviceID := data[offset+3]
+	fragmentOffsetID := binary.LittleEndian.Uint32(data[offset+4 : offset+8])
+	fragmentID := uint16(fragmentOffsetID >> 16)        // FragmentID takes 2 bytes for MStream 2.x
 	fragmentOffset := uint16(fragmentOffsetID & 0xffff) // FragmentOffset takes 2 bytes for MStream 2.x
 
 	//log.Debug("DecodeFragment: FragmentLength: %d", fragmentLength)
@@ -233,12 +233,12 @@ func (ms *MStreamLayer) DecodeFragment(offset int, data []byte) (int, error) {
 
 	fragment := &MStreamFragment{
 		FragmentLength: fragmentLength,
-		Subtype: Subtype(subtype),
-		Flags: flags,
-		DeviceID: deviceID,
-		FragmentID: fragmentID,
+		Subtype:        Subtype(subtype),
+		Flags:          flags,
+		DeviceID:       deviceID,
+		FragmentID:     fragmentID,
 		FragmentOffset: fragmentOffset,
-		Data: data[offset + 8:newOffset],
+		Data:           data[offset+8 : newOffset],
 	}
 
 	ms.Fragments = append(ms.Fragments, fragment)
@@ -260,7 +260,7 @@ func (ms *MStreamLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback)
 	// MStream layer consists of fragments without common layer header
 	ms.BaseLayer = layers.BaseLayer{
 		Contents: []byte{},
-		Payload: data,
+		Payload:  data,
 	}
 
 	var err error

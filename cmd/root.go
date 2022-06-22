@@ -17,18 +17,18 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"io"
+	"jinr.ru/greenlab/go-adc/cmd/completion"
 	"jinr.ru/greenlab/go-adc/cmd/config"
 	"jinr.ru/greenlab/go-adc/cmd/control"
 	"jinr.ru/greenlab/go-adc/cmd/discover"
 	"jinr.ru/greenlab/go-adc/cmd/mstream"
-	"jinr.ru/greenlab/go-adc/cmd/completion"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
-func NewRootCommand(out io.Writer) (*cobra.Command) {
+func NewRootCommand(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "go-adc",
-		Short:         "Tool to work with ADC64 devices",
+		Use:   "go-adc",
+		Short: "Tool to work with ADC64 devices",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			log.Init(cmd.ErrOrStderr())
 		},

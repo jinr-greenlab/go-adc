@@ -21,8 +21,8 @@ import (
 
 func NewInitCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "init",
-		Short:         "Create default config",
+		Use:   "init",
+		Short: "Create default config",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			config := config.NewDefaultConfig()
 			return config.Persist(false)

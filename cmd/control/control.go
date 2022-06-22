@@ -25,8 +25,8 @@ const (
 
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "control",
-		Short:         "Control subcommand",
+		Use:   "control",
+		Short: "Control subcommand",
 	}
 
 	cmd.AddCommand(reg.NewRegCommand())

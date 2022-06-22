@@ -39,13 +39,13 @@ const (
  bits are mapped to the rightmost 23 bits of a multicast IPv4 address.
  For example, if the IPv4 multicast address of a group is 224.0.1.1,
  the IPv4 multicast MAC address of this group is 01-00-5E-00-01-01.`
- */
+*/
 
 type DiscoverServer struct {
 	srv.Server
 	*net.Interface
 	state *State
-	api *ApiServer
+	api   *ApiServer
 }
 
 func NewDiscoverServer(ctx context.Context, cfg *config.Config) (*DiscoverServer, error) {
@@ -71,11 +71,11 @@ func NewDiscoverServer(ctx context.Context, cfg *config.Config) (*DiscoverServer
 		Server: srv.Server{
 			Context: context.Background(),
 			UDPAddr: uaddr,
-			ChIn: make(chan srv.InPacket),
-			Config: cfg,
+			ChIn:    make(chan srv.InPacket),
+			Config:  cfg,
 		},
 		Interface: iface,
-		state: state,
+		state:     state,
 	}
 
 	apiServer, err := NewApiServer(ctx, cfg, s)
@@ -115,11 +115,11 @@ func (s *DiscoverServer) Run() error {
 			}
 
 			captureInfo := gopacket.CaptureInfo{
-				Length: length,
-				CaptureLength: length,
+				Length:         length,
+				CaptureLength:  length,
 				InterfaceIndex: s.Interface.Index,
-				Timestamp: time.Now(),
-				AncillaryData: []interface{}{udpAddr},
+				Timestamp:      time.Now(),
+				AncillaryData:  []interface{}{udpAddr},
 			}
 			packet := srv.InPacket{CaptureInfo: captureInfo, Data: make([]byte, length)}
 			copy(packet.Data, buffer[:length])
@@ -172,4 +172,3 @@ func (s *DiscoverServer) Run() error {
 	}
 
 }
-
