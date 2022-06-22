@@ -33,4 +33,3 @@ lint:
 	$(LINTER) run --config $(LINTER_CONFIG)
 	@git --no-pager show --check
 #	@./tools/golint
-
