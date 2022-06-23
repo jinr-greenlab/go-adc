@@ -229,6 +229,28 @@ func (d *Device) SetTriggerLemo(val bool) error {
 	return d.ctrl.RegRequest(ops, d.IP)
 }
 
+func (d *Device) SetMafSelector(val int) error {
+	d.dspParams.Enabled = true //need setters?
+	d.dspParams.MafEnabled = true
+	d.dspParams.MafTapSel = val
+
+	for i := 0; i < Nch; i++ {
+		d.WriteChReg(i, MemMap[MemChCtrl], uint32(d.encodeChCtrlRegValue(i)))
+	}
+
+	return nil
+}
+
+func (d *Device) SetMafBlcThresh(val int) error {
+	d.dspParams.BlcThr = val //need setters?
+
+	for i := 0; i < Nch; i++ {
+		d.WriteChCtrl(i)
+	}
+
+	return nil
+}
+
 // for details how to start and stop streaming data see DominoDevice::writeSettings()
 
 // MStreamStart ...
