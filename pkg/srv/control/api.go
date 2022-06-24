@@ -97,6 +97,10 @@ type MAFSetup struct {
 	BLC      int
 }
 
+type InvertSetup struct {
+	Invert bool
+}
+
 type ApiServer struct {
 	context.Context
 	*config.Config
@@ -216,6 +220,7 @@ func (s *ApiServer) configureRouter() {
 	subRouter.HandleFunc("/mstream/{action:start|stop}", s.handleMStreamActionAll()).Methods("GET")
 	subRouter.HandleFunc("/trigger/{device}", s.handleTrigger()).Methods("POST")
 	subRouter.HandleFunc("/maf/{device}", s.handleMAF()).Methods("POST")
+	subRouter.HandleFunc("/invert_signal/{device}", s.handleInvert()).Methods("POST")
 }
 
 func (s *ApiServer) handleRegRead() http.HandlerFunc {
@@ -404,6 +409,32 @@ func (s *ApiServer) handleMAF() http.HandlerFunc {
 
 		err = device.SetMafSelector(setup.Selector)
 		err = device.SetMafBlcThresh(setup.BLC)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
+}
+
+func (s *ApiServer) handleInvert() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		setup := &InvertSetup{}
+
+		err := json.NewDecoder(r.Body).Decode(setup)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		device, err := s.ctrl.GetDeviceByName(vars["device"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		err = device.SetInvert(setup.Invert)
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)

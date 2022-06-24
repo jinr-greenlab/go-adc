@@ -251,6 +251,15 @@ func (d *Device) SetMafBlcThresh(val int) error {
 	return nil
 }
 
+func (d *Device) SetInvert(val bool) error {
+	d.InvertInput = val
+	for i := 0; i < Nch; i++ {
+		d.WriteChCtrl(i)
+	}
+
+	return nil
+}
+
 // for details how to start and stop streaming data see DominoDevice::writeSettings()
 
 // MStreamStart ...

@@ -27,6 +27,8 @@ type Device interface {
 	SetMafSelector(val int) error
 	SetMafBlcThresh(val int) error
 
+	SetInvert(val bool) error
+
 	RegRead(addr uint16) (*layers.Reg, error)
 	RegReadAll() ([]*layers.Reg, error)
 	RegWrite(reg *layers.Reg) error
