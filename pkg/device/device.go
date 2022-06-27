@@ -30,7 +30,7 @@ const (
 type FirParams struct {
 	PresetKey string
 	Enabled   bool
-	Roundoff  int
+	Roundoff  uint16 //int
 	Coef      []uint16
 }
 
@@ -44,7 +44,7 @@ func NewFirParams() *FirParams {
 	return f
 }
 
-func (f *FirParams) setRoundoff(value int) {
+func (f *FirParams) setRoundoff(value uint16) {
 	if value < 0 {
 		value = 0
 	}
@@ -258,6 +258,31 @@ func (d *Device) SetInvert(val bool) error {
 	}
 
 	return nil
+}
+
+func (d *Device) SetRoundoff(val uint16) error {
+	d.dspParams.fir.setRoundoff(val)
+	for i := 0; i < Nch; i++ {
+		d.WriteChCtrl(i)
+	}
+
+	return nil
+}
+
+func (d *Device) SetFirCoef(val []uint16) error {
+	ops := []*layers.RegOp{
+		{Reg: &layers.Reg{Addr: RegMap[RegFirControl], Value: 1}}, //need to implement setting fir on/of
+		{Reg: &layers.Reg{Addr: RegMap[RegFirRoundoff], Value: d.dspParams.fir.Roundoff}},
+	}
+
+	for i := 0; i < 16; i++ {
+		ops = append(ops, &layers.RegOp{Reg: &layers.Reg{Addr: RegMap[RegFirCoefStart] + uint16(i), Value: val[i]}})
+	}
+
+	ops = append(ops, &layers.RegOp{Reg: &layers.Reg{Addr: RegMap[RegFirCoefCtrl], Value: 1}})
+	ops = append(ops, &layers.RegOp{Reg: &layers.Reg{Addr: RegMap[RegFirCoefCtrl], Value: 0}})
+
+	return d.ctrl.RegRequest(ops, d.IP)
 }
 
 // for details how to start and stop streaming data see DominoDevice::writeSettings()

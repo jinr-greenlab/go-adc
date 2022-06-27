@@ -101,6 +101,11 @@ type InvertSetup struct {
 	Invert bool
 }
 
+type FirSetup struct {
+	Coef     []uint16
+	Roundoff uint16
+}
+
 type ApiServer struct {
 	context.Context
 	*config.Config
@@ -221,6 +226,7 @@ func (s *ApiServer) configureRouter() {
 	subRouter.HandleFunc("/trigger/{device}", s.handleTrigger()).Methods("POST")
 	subRouter.HandleFunc("/maf/{device}", s.handleMAF()).Methods("POST")
 	subRouter.HandleFunc("/invert_signal/{device}", s.handleInvert()).Methods("POST")
+	subRouter.HandleFunc("/fir/{device}", s.handleFir()).Methods("POST")
 }
 
 func (s *ApiServer) handleRegRead() http.HandlerFunc {
@@ -435,6 +441,33 @@ func (s *ApiServer) handleInvert() http.HandlerFunc {
 		}
 
 		err = device.SetInvert(setup.Invert)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
+}
+
+func (s *ApiServer) handleFir() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		setup := &FirSetup{}
+
+		err := json.NewDecoder(r.Body).Decode(setup)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		device, err := s.ctrl.GetDeviceByName(vars["device"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		err = device.SetRoundoff(setup.Roundoff)
+		err = device.SetFirCoef(setup.Coef)
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)

@@ -29,6 +29,9 @@ type Device interface {
 
 	SetInvert(val bool) error
 
+	SetRoundoff(val uint16) error
+	SetFirCoef(val []uint16) error
+
 	RegRead(addr uint16) (*layers.Reg, error)
 	RegReadAll() ([]*layers.Reg, error)
 	RegWrite(reg *layers.Reg) error
