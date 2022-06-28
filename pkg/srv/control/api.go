@@ -106,6 +106,11 @@ type FirSetup struct {
 	Roundoff uint16
 }
 
+type ReadoutWindowSetup struct {
+	Size    uint16
+	Latency uint16
+}
+
 type ApiServer struct {
 	context.Context
 	*config.Config
@@ -227,6 +232,7 @@ func (s *ApiServer) configureRouter() {
 	subRouter.HandleFunc("/maf/{device}", s.handleMAF()).Methods("POST")
 	subRouter.HandleFunc("/invert_signal/{device}", s.handleInvert()).Methods("POST")
 	subRouter.HandleFunc("/fir/{device}", s.handleFir()).Methods("POST")
+	subRouter.HandleFunc("/readout_window/{device}", s.handleReadoutWindow()).Methods("POST")
 }
 
 func (s *ApiServer) handleRegRead() http.HandlerFunc {
@@ -468,6 +474,33 @@ func (s *ApiServer) handleFir() http.HandlerFunc {
 
 		err = device.SetRoundoff(setup.Roundoff)
 		err = device.SetFirCoef(setup.Coef)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
+}
+
+func (s *ApiServer) handleReadoutWindow() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		setup := &ReadoutWindowSetup{}
+
+		err := json.NewDecoder(r.Body).Decode(setup)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		device, err := s.ctrl.GetDeviceByName(vars["device"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		err = device.SetWindowSize(setup.Size)
+		err = device.SetLatency(setup.Latency)
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)

@@ -279,9 +279,23 @@ func (d *Device) SetFirCoef(val []uint16) error {
 		ops = append(ops, &layers.RegOp{Reg: &layers.Reg{Addr: RegMap[RegFirCoefStart] + uint16(i), Value: val[i]}})
 	}
 
-	ops = append(ops, &layers.RegOp{Reg: &layers.Reg{Addr: RegMap[RegFirCoefCtrl], Value: 1}})
-	ops = append(ops, &layers.RegOp{Reg: &layers.Reg{Addr: RegMap[RegFirCoefCtrl], Value: 0}})
+	ops = append(ops, &layers.RegOp{Reg: &layers.Reg{Addr: RegMap[RegFirCoefCtrl], Value: 1}},
+		&layers.RegOp{Reg: &layers.Reg{Addr: RegMap[RegFirCoefCtrl], Value: 0}})
 
+	return d.ctrl.RegRequest(ops, d.IP)
+}
+
+func (d *Device) SetWindowSize(val uint16) error {
+	ops := []*layers.RegOp{
+		{Reg: &layers.Reg{Addr: RegMap[RegMstreamDataSizeBytes], Value: val}},
+	}
+	return d.ctrl.RegRequest(ops, d.IP)
+}
+
+func (d *Device) SetLatency(val uint16) error {
+	ops := []*layers.RegOp{
+		{Reg: &layers.Reg{Addr: RegMap[RegDeviceRlat], Value: val}},
+	}
 	return d.ctrl.RegRequest(ops, d.IP)
 }
 
