@@ -35,6 +35,8 @@ type Device interface {
 	SetWindowSize(val uint16) error
 	SetLatency(val uint16) error
 
+	SetChannels(val layers.ChannelsSetup) error
+
 	RegRead(addr uint16) (*layers.Reg, error)
 	RegReadAll() ([]*layers.Reg, error)
 	RegWrite(reg *layers.Reg) error

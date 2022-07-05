@@ -299,6 +299,34 @@ func (d *Device) SetLatency(val uint16) error {
 	return d.ctrl.RegRequest(ops, d.IP)
 }
 
+func (d *Device) SetChannels(val layers.ChannelsSetup) error {
+	for i := 0; i < len(val.Channels); i++ {
+		id := val.Channels[i].Id
+		d.ChSettings[id].Enabled = val.Channels[id].En
+		d.ChSettings[id].TriggerEnabled = val.Channels[id].Thr_en
+		d.ChSettings[id].TriggerThreshold = val.Channels[id].Trig_thr //to fix
+		d.WriteChReg(id, MemMap[MemChCtrl], uint32(d.encodeChCtrlRegValue(i)))
+		d.WriteChReg(id, MemMap[MemChBaseline], uint32(val.Channels[id].Baseline))
+		thr := val.Channels[id].ZS_thr //to do - add fw check
+		if thr < -32768 {
+			thr = -32768
+		}
+		if thr > 32767 {
+			thr = 32767
+		}
+		d.WriteChReg(id, MemMap[MemChZsThr], uint32(thr))
+		thr = val.Channels[id].Trig_thr //todo - add fw check, refactor
+		if thr < -32768 {
+			thr = -32768
+		}
+		if thr > 32767 {
+			thr = 32767
+		}
+		d.WriteChReg(id, MemMap[MemChThr], uint32(thr))
+	}
+	return nil
+}
+
 // for details how to start and stop streaming data see DominoDevice::writeSettings()
 
 // MStreamStart ...
