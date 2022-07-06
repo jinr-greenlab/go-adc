@@ -27,6 +27,12 @@ const (
 	FirRoundoffMax     = 3
 )
 
+type FwVersion struct {
+	Maj      uint16
+	Min      uint16
+	Revision uint16
+}
+
 type FirParams struct {
 	PresetKey string
 	Enabled   bool
@@ -103,6 +109,7 @@ type ChannelSettings struct {
 
 type Device struct {
 	*config.Device
+	fwVersion                      *FwVersion
 	ChSettings                     [Nch]*ChannelSettings
 	TriggerDelay                   int
 	InvertInput                    bool
@@ -123,6 +130,7 @@ var _ deviceifc.Device = &Device{}
 func NewDevice(device *config.Device, ctrl ifc.ControlServer, state ifc.State) (*Device, error) {
 	d := &Device{
 		Device:                         device,
+		fwVersion:                      nil,
 		TriggerDelay:                   5,
 		InvertInput:                    false,
 		ZeroSuppressionEnabled:         false,
@@ -170,6 +178,60 @@ func (d *Device) RegWrite(reg *layers.Reg) error {
 // Update ...
 func (d *Device) UpdateReg(reg *layers.Reg) error {
 	return d.state.SetReg(reg, d.Name)
+}
+
+func (d *Device) ReadFirmware() error {
+	ver, err := d.RegRead(RegMap[RegFwVer])
+	if err != nil {
+		return err
+	}
+
+	rev, err := d.RegRead(RegMap[RegFwRev])
+	if err != nil {
+		return err
+	}
+
+	d.fwVersion.Maj = (ver.Value >> 8) & 0xFF
+	d.fwVersion.Min = ver.Value & 0xFF
+	d.fwVersion.Revision = rev.Value
+
+	return nil
+}
+
+func (d *Device) HasAdcRawDataSigned() bool {
+	d.ReadFirmware()
+	if d.fwVersion == nil {
+		return true
+	}
+
+	if d.fwVersion.Maj >= 1 || //fix formatting
+		(d.fwVersion.Maj == 1 && d.fwVersion.Min >= 0) ||
+		(d.fwVersion.Maj == 1 && d.fwVersion.Min == 0 && d.fwVersion.Revision >= 23232) {
+		return true
+	}
+
+	return false
+}
+
+func (d *Device) TruncateValue(val int) int {
+	if d.HasAdcRawDataSigned() {
+		if val < -32768 {
+			val = -32768
+		}
+		if val > 32767 {
+			val = 32767
+		}
+	} else {
+		val += 0x8000
+		if val < 0 {
+			val = 0
+		}
+		if val > 0xFFFF {
+			val = 0xFFFF
+		}
+	}
+
+	return val
 }
 
 func (d *Device) SetTriggerTimer(val bool) error {
@@ -306,22 +368,13 @@ func (d *Device) SetChannels(val layers.ChannelsSetup) error {
 		d.ChSettings[id].TriggerEnabled = val.Channels[id].Thr_en
 		d.ChSettings[id].TriggerThreshold = val.Channels[id].Trig_thr //to fix
 		d.WriteChReg(id, MemMap[MemChCtrl], uint32(d.encodeChCtrlRegValue(i)))
+
 		d.WriteChReg(id, MemMap[MemChBaseline], uint32(val.Channels[id].Baseline))
-		thr := val.Channels[id].ZS_thr //to do - add fw check
-		if thr < -32768 {
-			thr = -32768
-		}
-		if thr > 32767 {
-			thr = 32767
-		}
+
+		thr := d.TruncateValue(val.Channels[id].ZS_thr)
 		d.WriteChReg(id, MemMap[MemChZsThr], uint32(thr))
-		thr = val.Channels[id].Trig_thr //todo - add fw check, refactor
-		if thr < -32768 {
-			thr = -32768
-		}
-		if thr > 32767 {
-			thr = 32767
-		}
+
+		thr = d.TruncateValue(val.Channels[id].Trig_thr)
 		d.WriteChReg(id, MemMap[MemChThr], uint32(thr))
 	}
 	return nil
