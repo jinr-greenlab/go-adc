@@ -37,6 +37,8 @@ type Device interface {
 
 	SetChannels(val layers.ChannelsSetup) error
 
+	SetZs(val bool) error
+
 	RegRead(addr uint16) (*layers.Reg, error)
 	RegReadAll() ([]*layers.Reg, error)
 	RegWrite(reg *layers.Reg) error

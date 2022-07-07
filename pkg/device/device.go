@@ -28,8 +28,8 @@ const (
 )
 
 type FwVersion struct {
-	Maj      uint16
-	Min      uint16
+	Major    uint16
+	Minor    uint16
 	Revision uint16
 }
 
@@ -191,8 +191,8 @@ func (d *Device) ReadFirmware() error {
 		return err
 	}
 
-	d.fwVersion.Maj = (ver.Value >> 8) & 0xFF
-	d.fwVersion.Min = ver.Value & 0xFF
+	d.fwVersion.Major = (ver.Value >> 8) & 0xFF
+	d.fwVersion.Minor = ver.Value & 0xFF
 	d.fwVersion.Revision = rev.Value
 
 	return nil
@@ -204,9 +204,9 @@ func (d *Device) HasAdcRawDataSigned() bool {
 		return true
 	}
 
-	if d.fwVersion.Maj >= 1 || //fix formatting
-		(d.fwVersion.Maj == 1 && d.fwVersion.Min >= 0) ||
-		(d.fwVersion.Maj == 1 && d.fwVersion.Min == 0 && d.fwVersion.Revision >= 23232) {
+	if d.fwVersion.Major >= 1 || //fix formatting
+		(d.fwVersion.Major == 1 && d.fwVersion.Minor >= 0) ||
+		(d.fwVersion.Major == 1 && d.fwVersion.Minor == 0 && d.fwVersion.Revision >= 23232) {
 		return true
 	}
 
@@ -365,18 +365,24 @@ func (d *Device) SetChannels(val layers.ChannelsSetup) error {
 	for i := 0; i < len(val.Channels); i++ {
 		id := val.Channels[i].Id
 		d.ChSettings[id].Enabled = val.Channels[id].En
-		d.ChSettings[id].TriggerEnabled = val.Channels[id].Thr_en
-		d.ChSettings[id].TriggerThreshold = val.Channels[id].Trig_thr //to fix
+		d.ChSettings[id].TriggerEnabled = val.Channels[id].TrigEn
+		d.ChSettings[id].TriggerThreshold = val.Channels[id].TrigThr //to fix
 		d.WriteChReg(id, MemMap[MemChCtrl], uint32(d.encodeChCtrlRegValue(i)))
 
 		d.WriteChReg(id, MemMap[MemChBaseline], uint32(val.Channels[id].Baseline))
 
-		thr := d.TruncateValue(val.Channels[id].ZS_thr)
+		thr := d.TruncateValue(val.Channels[id].ZsThr)
 		d.WriteChReg(id, MemMap[MemChZsThr], uint32(thr))
 
-		thr = d.TruncateValue(val.Channels[id].Trig_thr)
+		thr = d.TruncateValue(val.Channels[id].TrigThr)
 		d.WriteChReg(id, MemMap[MemChThr], uint32(thr))
 	}
+	return nil
+}
+
+func (d *Device) SetZs(val bool) error {
+	d.ZeroSuppressionEnabled = val
+
 	return nil
 }
 
@@ -384,11 +390,16 @@ func (d *Device) SetChannels(val layers.ChannelsSetup) error {
 
 // MStreamStart ...
 func (d *Device) MStreamStart() error {
+	var ercBit uint16 = 1
+	if d.ZeroSuppressionEnabled {
+		ercBit = 2
+	}
+
 	var ops []*layers.RegOp
 	ops = []*layers.RegOp{
 		{Reg: &layers.Reg{Addr: RegMap[RegDeviceCtrl], Value: 0}},
 		{Reg: &layers.Reg{Addr: RegMap[RegDeviceCtrl], Value: 0x8000}},
-		{Reg: &layers.Reg{Addr: RegMap[RegMstreamRunCtrl], Value: 1}},
+		{Reg: &layers.Reg{Addr: RegMap[RegMstreamRunCtrl], Value: ercBit}},
 	}
 	return d.ctrl.RegRequest(ops, d.IP)
 }

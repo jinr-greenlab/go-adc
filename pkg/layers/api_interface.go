@@ -17,10 +17,10 @@ package layers
 type Channel struct {
 	Id       int
 	En       bool
-	Thr_en   bool
+	TrigEn   bool
 	Baseline int
-	Trig_thr int
-	ZS_thr   int
+	TrigThr  int
+	ZsThr    int
 }
 
 type ChannelsSetup struct {

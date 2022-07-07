@@ -111,20 +111,9 @@ type ReadoutWindowSetup struct {
 	Latency uint16
 }
 
-/*
-type Channel struct {
-	id       int
-	en       bool
-	thr_en   bool
-	baseline int
-	trig_thr int
-	zs_thr   int
+type ZsSetup struct {
+	Zs bool
 }
-
-type ChannelsSetup struct {
-	Channels []Channel
-}
-*/
 
 type ApiServer struct {
 	context.Context
@@ -249,6 +238,7 @@ func (s *ApiServer) configureRouter() {
 	subRouter.HandleFunc("/fir/{device}", s.handleFir()).Methods("POST")
 	subRouter.HandleFunc("/readout_window/{device}", s.handleReadoutWindow()).Methods("POST")
 	subRouter.HandleFunc("/channels/{device}", s.handleChannels()).Methods("POST")
+	subRouter.HandleFunc("/zs/{device}", s.handleZs()).Methods("POST")
 }
 
 func (s *ApiServer) handleRegRead() http.HandlerFunc {
@@ -543,6 +533,32 @@ func (s *ApiServer) handleChannels() http.HandlerFunc {
 		}
 
 		err = device.SetChannels(*setup)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
+}
+
+func (s *ApiServer) handleZs() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		setup := &ZsSetup{}
+
+		err := json.NewDecoder(r.Body).Decode(setup)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		device, err := s.ctrl.GetDeviceByName(vars["device"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		err = device.SetZs(setup.Zs)
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)
