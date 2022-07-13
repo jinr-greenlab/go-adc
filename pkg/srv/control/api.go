@@ -97,6 +97,24 @@ type MAFSetup struct {
 	BLC      int
 }
 
+type InvertSetup struct {
+	Invert bool
+}
+
+type FirSetup struct {
+	Coef     []uint16
+	Roundoff uint16
+}
+
+type ReadoutWindowSetup struct {
+	Size    uint16
+	Latency uint16
+}
+
+type ZsSetup struct {
+	Zs bool
+}
+
 type ApiServer struct {
 	context.Context
 	*config.Config
@@ -216,6 +234,11 @@ func (s *ApiServer) configureRouter() {
 	subRouter.HandleFunc("/mstream/{action:start|stop}", s.handleMStreamActionAll()).Methods("GET")
 	subRouter.HandleFunc("/trigger/{device}", s.handleTrigger()).Methods("POST")
 	subRouter.HandleFunc("/maf/{device}", s.handleMAF()).Methods("POST")
+	subRouter.HandleFunc("/invert_signal/{device}", s.handleInvert()).Methods("POST")
+	subRouter.HandleFunc("/fir/{device}", s.handleFir()).Methods("POST")
+	subRouter.HandleFunc("/readout_window/{device}", s.handleReadoutWindow()).Methods("POST")
+	subRouter.HandleFunc("/channels/{device}", s.handleChannels()).Methods("POST")
+	subRouter.HandleFunc("/zs/{device}", s.handleZs()).Methods("POST")
 }
 
 func (s *ApiServer) handleRegRead() http.HandlerFunc {
@@ -404,6 +427,138 @@ func (s *ApiServer) handleMAF() http.HandlerFunc {
 
 		err = device.SetMafSelector(setup.Selector)
 		err = device.SetMafBlcThresh(setup.BLC)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
+}
+
+func (s *ApiServer) handleInvert() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		setup := &InvertSetup{}
+
+		err := json.NewDecoder(r.Body).Decode(setup)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		device, err := s.ctrl.GetDeviceByName(vars["device"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		err = device.SetInvert(setup.Invert)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
+}
+
+func (s *ApiServer) handleFir() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		setup := &FirSetup{}
+
+		err := json.NewDecoder(r.Body).Decode(setup)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		device, err := s.ctrl.GetDeviceByName(vars["device"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		err = device.SetRoundoff(setup.Roundoff)
+		err = device.SetFirCoef(setup.Coef)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
+}
+
+func (s *ApiServer) handleReadoutWindow() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		setup := &ReadoutWindowSetup{}
+
+		err := json.NewDecoder(r.Body).Decode(setup)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		device, err := s.ctrl.GetDeviceByName(vars["device"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		err = device.SetWindowSize(setup.Size)
+		err = device.SetLatency(setup.Latency)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
+}
+
+func (s *ApiServer) handleChannels() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		setup := &layers.ChannelsSetup{}
+
+		err := json.NewDecoder(r.Body).Decode(setup)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		device, err := s.ctrl.GetDeviceByName(vars["device"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		err = device.SetChannels(*setup)
+
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadGateway)
+			return
+		}
+	}
+}
+
+func (s *ApiServer) handleZs() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		setup := &ZsSetup{}
+
+		err := json.NewDecoder(r.Body).Decode(setup)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		device, err := s.ctrl.GetDeviceByName(vars["device"])
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		err = device.SetZs(setup.Zs)
 
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadGateway)

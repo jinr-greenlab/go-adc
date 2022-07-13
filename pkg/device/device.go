@@ -27,10 +27,16 @@ const (
 	FirRoundoffMax     = 3
 )
 
+type FwVersion struct {
+	Major    uint16
+	Minor    uint16
+	Revision uint16
+}
+
 type FirParams struct {
 	PresetKey string
 	Enabled   bool
-	Roundoff  int
+	Roundoff  uint16 //int
 	Coef      []uint16
 }
 
@@ -44,7 +50,7 @@ func NewFirParams() *FirParams {
 	return f
 }
 
-func (f *FirParams) setRoundoff(value int) {
+func (f *FirParams) setRoundoff(value uint16) {
 	if value < 0 {
 		value = 0
 	}
@@ -103,6 +109,7 @@ type ChannelSettings struct {
 
 type Device struct {
 	*config.Device
+	fwVersion                      *FwVersion
 	ChSettings                     [Nch]*ChannelSettings
 	TriggerDelay                   int
 	InvertInput                    bool
@@ -123,6 +130,7 @@ var _ deviceifc.Device = &Device{}
 func NewDevice(device *config.Device, ctrl ifc.ControlServer, state ifc.State) (*Device, error) {
 	d := &Device{
 		Device:                         device,
+		fwVersion:                      nil,
 		TriggerDelay:                   5,
 		InvertInput:                    false,
 		ZeroSuppressionEnabled:         false,
@@ -170,6 +178,60 @@ func (d *Device) RegWrite(reg *layers.Reg) error {
 // Update ...
 func (d *Device) UpdateReg(reg *layers.Reg) error {
 	return d.state.SetReg(reg, d.Name)
+}
+
+func (d *Device) ReadFirmware() error {
+	ver, err := d.RegRead(RegMap[RegFwVer])
+	if err != nil {
+		return err
+	}
+
+	rev, err := d.RegRead(RegMap[RegFwRev])
+	if err != nil {
+		return err
+	}
+
+	d.fwVersion.Major = (ver.Value >> 8) & 0xFF
+	d.fwVersion.Minor = ver.Value & 0xFF
+	d.fwVersion.Revision = rev.Value
+
+	return nil
+}
+
+func (d *Device) HasAdcRawDataSigned() bool {
+	d.ReadFirmware()
+	if d.fwVersion == nil {
+		return true
+	}
+
+	if d.fwVersion.Major >= 1 || //fix formatting
+		(d.fwVersion.Major == 1 && d.fwVersion.Minor >= 0) ||
+		(d.fwVersion.Major == 1 && d.fwVersion.Minor == 0 && d.fwVersion.Revision >= 23232) {
+		return true
+	}
+
+	return false
+}
+
+func (d *Device) TruncateValue(val int) int {
+	if d.HasAdcRawDataSigned() {
+		if val < -32768 {
+			val = -32768
+		}
+		if val > 32767 {
+			val = 32767
+		}
+	} else {
+		val += 0x8000
+		if val < 0 {
+			val = 0
+		}
+		if val > 0xFFFF {
+			val = 0xFFFF
+		}
+	}
+
+	return val
 }
 
 func (d *Device) SetTriggerTimer(val bool) error {
@@ -251,15 +313,93 @@ func (d *Device) SetMafBlcThresh(val int) error {
 	return nil
 }
 
+func (d *Device) SetInvert(val bool) error {
+	d.InvertInput = val
+	for i := 0; i < Nch; i++ {
+		d.WriteChCtrl(i)
+	}
+
+	return nil
+}
+
+func (d *Device) SetRoundoff(val uint16) error {
+	d.dspParams.fir.setRoundoff(val)
+	for i := 0; i < Nch; i++ {
+		d.WriteChCtrl(i)
+	}
+
+	return nil
+}
+
+func (d *Device) SetFirCoef(val []uint16) error {
+	ops := []*layers.RegOp{
+		{Reg: &layers.Reg{Addr: RegMap[RegFirControl], Value: 1}}, //need to implement setting fir on/of
+		{Reg: &layers.Reg{Addr: RegMap[RegFirRoundoff], Value: d.dspParams.fir.Roundoff}},
+	}
+
+	for i := 0; i < 16; i++ {
+		ops = append(ops, &layers.RegOp{Reg: &layers.Reg{Addr: RegMap[RegFirCoefStart] + uint16(i), Value: val[i]}})
+	}
+
+	ops = append(ops, &layers.RegOp{Reg: &layers.Reg{Addr: RegMap[RegFirCoefCtrl], Value: 1}},
+		&layers.RegOp{Reg: &layers.Reg{Addr: RegMap[RegFirCoefCtrl], Value: 0}})
+
+	return d.ctrl.RegRequest(ops, d.IP)
+}
+
+func (d *Device) SetWindowSize(val uint16) error {
+	ops := []*layers.RegOp{
+		{Reg: &layers.Reg{Addr: RegMap[RegMstreamDataSizeBytes], Value: val}},
+	}
+	return d.ctrl.RegRequest(ops, d.IP)
+}
+
+func (d *Device) SetLatency(val uint16) error {
+	ops := []*layers.RegOp{
+		{Reg: &layers.Reg{Addr: RegMap[RegDeviceRlat], Value: val}},
+	}
+	return d.ctrl.RegRequest(ops, d.IP)
+}
+
+func (d *Device) SetChannels(val layers.ChannelsSetup) error {
+	for i := 0; i < len(val.Channels); i++ {
+		id := val.Channels[i].Id
+		d.ChSettings[id].Enabled = val.Channels[id].En
+		d.ChSettings[id].TriggerEnabled = val.Channels[id].TrigEn
+		d.ChSettings[id].TriggerThreshold = val.Channels[id].TrigThr //to fix
+		d.WriteChReg(id, MemMap[MemChCtrl], uint32(d.encodeChCtrlRegValue(i)))
+
+		d.WriteChReg(id, MemMap[MemChBaseline], uint32(val.Channels[id].Baseline))
+
+		thr := d.TruncateValue(val.Channels[id].ZsThr)
+		d.WriteChReg(id, MemMap[MemChZsThr], uint32(thr))
+
+		thr = d.TruncateValue(val.Channels[id].TrigThr)
+		d.WriteChReg(id, MemMap[MemChThr], uint32(thr))
+	}
+	return nil
+}
+
+func (d *Device) SetZs(val bool) error {
+	d.ZeroSuppressionEnabled = val
+
+	return nil
+}
+
 // for details how to start and stop streaming data see DominoDevice::writeSettings()
 
 // MStreamStart ...
 func (d *Device) MStreamStart() error {
+	var ercBit uint16 = 1
+	if d.ZeroSuppressionEnabled {
+		ercBit = 2
+	}
+
 	var ops []*layers.RegOp
 	ops = []*layers.RegOp{
 		{Reg: &layers.Reg{Addr: RegMap[RegDeviceCtrl], Value: 0}},
 		{Reg: &layers.Reg{Addr: RegMap[RegDeviceCtrl], Value: 0x8000}},
-		{Reg: &layers.Reg{Addr: RegMap[RegMstreamRunCtrl], Value: 1}},
+		{Reg: &layers.Reg{Addr: RegMap[RegMstreamRunCtrl], Value: ercBit}},
 	}
 	return d.ctrl.RegRequest(ops, d.IP)
 }
