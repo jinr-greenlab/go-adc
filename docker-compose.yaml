@@ -5,8 +5,8 @@ services:
     image: quay.io/kozhukalov/go-adc
     restart: always
     volumes:
-    - /home/daq/go_adc_tmp:/data
-    - /home/daq/.go-adc:/root/.go-adc
+    - /home/pmtlab/tmp:/data
+    - /home/pmtlab/.go-adc:/root/.go-adc
     network_mode: host
     command: go-adc mstream start
   control-server:
