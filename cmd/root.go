@@ -15,6 +15,7 @@
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -24,15 +25,26 @@ import (
 	"jinr.ru/greenlab/go-adc/cmd/control"
 	"jinr.ru/greenlab/go-adc/cmd/discover"
 	"jinr.ru/greenlab/go-adc/cmd/mstream"
+	pkgconfig "jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
+const (
+	LogLevelOptionName = "log-level"
+)
+
 func NewRootCommand(out io.Writer) *cobra.Command {
+	var logLevel string
+	cfg := pkgconfig.NewDefaultConfig()
+	cfg.Load()
 	cmd := &cobra.Command{
 		Use:   "go-adc",
 		Short: "Tool to work with ADC64 devices",
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			log.Init(cmd.ErrOrStderr())
+			if logLevel != "" {
+				cfg.LogLevel = logLevel
+			}
+			log.Init(cmd.ErrOrStderr(), cfg.LogLevel)
 		},
 	}
 	cmd.SetOut(out)
@@ -41,5 +53,6 @@ func NewRootCommand(out io.Writer) *cobra.Command {
 	cmd.AddCommand(discover.NewCommand())
 	cmd.AddCommand(mstream.NewCommand())
 	cmd.AddCommand(completion.NewCommand())
+	cmd.PersistentFlags().StringVar(&logLevel, LogLevelOptionName, "", fmt.Sprintf("Log level. %s", log.HelpLevels))
 	return cmd
 }

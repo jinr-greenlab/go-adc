@@ -100,7 +100,7 @@ func NewApiServer(ctx context.Context, cfg *config.Config, mstream *MStreamServe
 
 // Start
 func (s *ApiServer) Run() error {
-	log.Debug("Starting API server: address: %s port: %d", s.Config.IP, ApiPort)
+	log.Info("Starting API server: address: %s port: %d", s.Config.IP, ApiPort)
 	s.configureRouter()
 	httpServer := &http.Server{
 		Handler: s.Router,

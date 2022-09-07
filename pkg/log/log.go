@@ -15,6 +15,7 @@
 package log
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -24,12 +25,12 @@ import (
 type LogLevel int
 
 const (
-	LogPrefix       = "[go-adc] "
-	ErrorPrefix     = "[error] "
-	WarningPrefix   = "[warn] "
-	InfoPrefix      = "[info] "
-	DebugPrefix     = "[debug] "
-	DefaultLogLevel = InfoLevel
+	LogPrefix     = "[go-adc] "
+	ErrorPrefix   = "[error] "
+	WarningPrefix = "[warn] "
+	InfoPrefix    = "[info] "
+	DebugPrefix   = "[debug] "
+	HelpLevels    = "Must be one of: error, warning, info, debug."
 )
 
 const (
@@ -45,12 +46,30 @@ type Logger struct {
 }
 
 var logger = &Logger{
-	level:  DefaultLogLevel,
+	level:  InfoLevel,
 	Logger: log.New(os.Stderr, LogPrefix, log.LstdFlags),
 }
 
-func Init(out io.Writer) {
+func SetLevel(strLevel string) error {
+	levelMapping := map[string]LogLevel{
+		"error":   ErrorLevel,
+		"warning": WarningLevel,
+		"info":    InfoLevel,
+		"debug":   DebugLevel,
+	}
+	level, ok := levelMapping[strLevel]
+	if !ok {
+		return errors.New("Wrong log level. " + HelpLevels)
+	}
+	logger.level = level
+	return nil
+}
+
+func Init(out io.Writer, strLevel string) {
 	logger.SetOutput(out)
+	if err := SetLevel(strLevel); err != nil {
+		panic(err)
+	}
 }
 
 func Error(format string, v ...interface{}) {

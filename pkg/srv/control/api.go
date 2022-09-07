@@ -125,7 +125,7 @@ type ApiServer struct {
 var _ ifc.ApiServer = &ApiServer{}
 
 func NewApiServer(ctx context.Context, cfg *config.Config, ctrl ifc.ControlServer) (ifc.ApiServer, error) {
-	log.Debug("Initializing API server with address: %s port: %d", cfg.IP, ApiPort)
+	log.Info("Initializing API server with address: %s port: %d", cfg.IP, ApiPort)
 
 	s := &ApiServer{
 		Context: ctx,
@@ -170,7 +170,7 @@ func (s *ApiServer) regReadAllHex(device string) ([]*RegHex, error) {
 
 // Start
 func (s *ApiServer) Run() error {
-	log.Debug("Starting API server: address: %s port: %d", s.Config.IP, ApiPort)
+	log.Info("Starting API server: address: %s port: %d", s.Config.IP, ApiPort)
 	s.configureRouter()
 	httpServer := &http.Server{
 		Handler: s.Router,

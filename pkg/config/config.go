@@ -31,6 +31,7 @@ type Device struct {
 }
 
 type Config struct {
+	LogLevel      string    `json:"logLevel,omitempty"`
 	DiscoverIP    *net.IP   `json:"discoverIP,omitempty"`
 	DiscoverIface string    `json:"discoverIface,omitempty"`
 	IP            *net.IP   `json:"ip,omitempty"`
@@ -118,6 +119,7 @@ func NewDefaultConfig() *Config {
 	ip := net.ParseIP(DefaultIP)
 
 	return &Config{
+		LogLevel:      DefaultLogLevel,
 		DiscoverIP:    &discoverIP,
 		DiscoverIface: DefaultDiscoverIface,
 		IP:            &ip,

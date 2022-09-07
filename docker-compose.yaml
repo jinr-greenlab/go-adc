@@ -8,10 +8,10 @@ services:
     - /home/pmtlab/tmp:/data
     - /home/pmtlab/.go-adc:/root/.go-adc
     network_mode: host
-    command: go-adc mstream start
+    command: go-adc --log-level debug mstream start
   control-server:
     <<: *mstream-server
-    command: go-adc control start
+    command: go-adc --log-level debug control start
   discover-server:
     <<: *mstream-server
-    command: go-adc discover start
+    command: go-adc --log-level debug discover start
