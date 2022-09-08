@@ -22,4 +22,5 @@ const (
 	DefaultDiscoverIP    = "239.192.1.1"
 	DefaultDiscoverIface = "eth0"
 	DefaultIP            = "192.168.1.100"
+	DefaultLogLevel      = "info"
 )
