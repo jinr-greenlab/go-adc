@@ -1,6 +1,7 @@
 # Config
 
 ```yaml
+logLevel: debug # must be one of error, warning, info, debug
 devices:
 - name: one
   ip: 192.168.1.101
