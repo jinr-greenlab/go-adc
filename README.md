@@ -23,3 +23,14 @@ go get -u golang.org/x/lint/golint
 ```sh
 go get -u github.com/golangci/golangci-lint/cmd/golangci-lint@v1.46.2
 ```
+
+## go-swagger
+1. Install go-swagger. For detailes how to install go-swagger binary on different platforms proceed to the next link
+https://goswagger.io/install.html
+1. Put swagger annotation tags into source file describing your APIs
+1. Generate swagger specificatioin file by typing
+```sh
+make swagger
+```
+1. When your start your server API docs will be available on
+http://localhost:your_port/swagger/
