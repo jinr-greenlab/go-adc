@@ -24,13 +24,12 @@ go get -u github.com/golangci/golangci-lint/cmd/golangci-lint@v1.46.2
 ```
 
 ## go-swagger
-1) mkdir swaggerui
-2) Install go-swagger. For detailes how to install go-swagger binary on different platforms proceed next link
+1. Install go-swagger. For detailes how to install go-swagger binary on different platforms proceed to the next link
 https://goswagger.io/install.html
-3) Copy content of https://github.com/swagger-api/swagger-ui/tree/master/dist directory into swaggerui dir
-4) Put swagger annotation tags into source file describing your APIs and put next string to routes
-s.Router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", http.FileServer(http.Dir("./swaggerui/")))) 
-5) Once your start your server API docs will be available on 
+1. Put swagger annotation tags into source file describing your APIs
+1. Generate swagger specificatioin file by typing
+```sh
+make swagger
+```
+1. When your start your server API docs will be available on
 http://localhost:your_port/swagger/
-
-

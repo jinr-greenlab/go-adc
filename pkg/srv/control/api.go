@@ -239,6 +239,7 @@ func (s *ApiServer) configureRouter() {
 	subRouter.HandleFunc("/readout_window/{device}", s.handleReadoutWindow()).Methods("POST")
 	subRouter.HandleFunc("/channels/{device}", s.handleChannels()).Methods("POST")
 	subRouter.HandleFunc("/zs/{device}", s.handleZs()).Methods("POST")
+	s.Router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", http.FileServer(http.Dir("./swaggerui/"))))
 }
 
 func (s *ApiServer) handleRegRead() http.HandlerFunc {
