@@ -151,12 +151,10 @@ func (s *MStreamServer) Run() error {
 	// Read packets from input queue and handle them properly
 	for _, device := range s.Config.Devices {
 		device := device
-		exitEventBuilderManager := make(chan bool)
 		eventBuilderManager := NewEventBuilderManager(
 			device.Name,
 			s.fragmentChs[device.Name],
 			s.writerChs[device.Name],
-			exitEventBuilderManager,
 		)
 
 		// Run mpd writers

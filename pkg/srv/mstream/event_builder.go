@@ -194,20 +194,17 @@ type EventBuilderManager struct {
 	writerCh      chan<- []byte
 	fragmentCh    <-chan *layers.MStreamFragment
 	seq           chan uint32
-	exitCh        <-chan bool
 }
 
 func NewEventBuilderManager(
 	deviceName string,
 	fragmentCh <-chan *layers.MStreamFragment,
-	writerCh chan<- []byte,
-	exitCh <-chan bool) *EventBuilderManager {
+	writerCh chan<- []byte) *EventBuilderManager {
 	log.Info("Creating EventBuilderManager: %s", deviceName)
 	return &EventBuilderManager{
 		deviceName: deviceName,
 		writerCh:   writerCh,
 		fragmentCh: fragmentCh,
-		exitCh:     exitCh,
 	}
 }
 
