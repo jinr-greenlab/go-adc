@@ -150,11 +150,11 @@ func (s *MStreamServer) Run() error {
 
 	// Read packets from input queue and handle them properly
 	for _, device := range s.Config.Devices {
-		device := device
-		eventBuilderManager := NewEventBuilderManager(
-			device.Name,
-			s.fragmentChs[device.Name],
-			s.writerChs[device.Name],
+		deviceName := device.Name
+		eventBuilder := NewEventBuilder(
+			deviceName,
+			s.fragmentChs[deviceName],
+			s.writerChs[deviceName],
 		)
 
 		// Run mpd writers
@@ -162,28 +162,28 @@ func (s *MStreamServer) Run() error {
 			currentFilename := ""
 			for {
 				select {
-				case filename := <-s.writerStateChs[device.Name]:
+				case filename := <-s.writerStateChs[deviceName]:
 
 					if currentFilename != "" {
-						w := s.writers[device.Name].(*Writer)
+						w := s.writers[deviceName].(*Writer)
 						w.Flush()
 					}
 					if filename == "" {
-						s.writers[device.Name] = io.Discard
+						s.writers[deviceName] = io.Discard
 					} else {
 						w, newWriterErr := NewWriter(filename)
 						if newWriterErr != nil {
 							log.Error("Error while creating writer: %s", err)
 							continue
 						}
-						s.writers[device.Name] = w
+						s.writers[deviceName] = w
 					}
 					currentFilename = filename
 				default:
 				}
 				select {
-				case bytes := <-s.writerChs[device.Name]:
-					_, writeErr := s.writers[device.Name].Write(bytes)
+				case bytes := <-s.writerChs[deviceName]:
+					_, writeErr := s.writers[deviceName].Write(bytes)
 					if writeErr != nil {
 						log.Error("Error while writing to file: %s", err)
 					}
@@ -195,15 +195,15 @@ func (s *MStreamServer) Run() error {
 
 		// Run event builders
 		go func() {
-			eventBuilderManager.Run()
+			eventBuilder.Run()
 		}()
 
 		// Run parsers
 		go func() {
-			fragmentBuilderManager := layers.NewFragmentBuilderManager(device.Name, s.fragmentChs[device.Name])
+			fragmentBuilderManager := layers.NewFragmentBuilderManager(deviceName, s.fragmentChs[deviceName])
 			fragmentBuilderManager.Init()
 
-			source := gopacket.NewPacketSource(s.packetSources[device.Name], layers.MLinkLayerType)
+			source := gopacket.NewPacketSource(s.packetSources[deviceName], layers.MLinkLayerType)
 			for packet := range source.Packets() {
 				var mlSeq uint16
 				mlinkLayer := packet.Layer(layers.MLinkLayerType)
