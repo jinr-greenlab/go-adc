@@ -28,6 +28,7 @@ import (
 type Device struct {
 	Name string  `json:"name,omitempty"`
 	IP   *net.IP `json:"ip,omitempty"`
+	Type string  `json:"type"` // this is one of adc64 or tqdc
 }
 
 type Config struct {

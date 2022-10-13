@@ -19,7 +19,7 @@ import "jinr.ru/greenlab/go-adc/pkg/layers"
 type State interface {
 	SetReg(reg *layers.Reg, deviceName string) error
 	GetReg(addr uint16, deviceName string) (*layers.Reg, error)
-	GetRegAll(deviceName string) ([]*layers.Reg, error)
+	GetRegs(deviceName string, regsToGet []uint16) ([]*layers.Reg, error)
 	CreateBucket(name string) error
 	Close()
 }

@@ -26,7 +26,6 @@ import (
 	"go.etcd.io/bbolt"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
-	pkgdevice "jinr.ru/greenlab/go-adc/pkg/device"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
@@ -136,8 +135,8 @@ func (s *State) GetReg(addr uint16, deviceName string) (*layers.Reg, error) {
 	}, nil
 }
 
-// GetRegAll ...
-func (s *State) GetRegAll(deviceName string) ([]*layers.Reg, error) {
+// GetRegs ...
+func (s *State) GetRegs(deviceName string, regsToGet []uint16) ([]*layers.Reg, error) {
 	log.Debug("Getting all registers: device: %s", deviceName)
 	var regs []*layers.Reg
 	if err := s.DB.View(func(tx *bbolt.Tx) error {
@@ -145,7 +144,7 @@ func (s *State) GetRegAll(deviceName string) ([]*layers.Reg, error) {
 		if b == nil {
 			return errors.New(fmt.Sprintf("Bucket not found: %s", regBucketName(deviceName)))
 		}
-		for _, addr := range pkgdevice.RegMap {
+		for _, addr := range regsToGet {
 			valueBytes := b.Get(uint16ToByte(addr))
 			if valueBytes == nil {
 				return errors.New(fmt.Sprintf("Key not found: %d", addr))
