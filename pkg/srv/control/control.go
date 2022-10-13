@@ -17,6 +17,7 @@ package control
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -24,7 +25,7 @@ import (
 
 	"github.com/google/gopacket"
 
-	pkgdevice "jinr.ru/greenlab/go-adc/pkg/device"
+	"jinr.ru/greenlab/go-adc/pkg/device/adc64"
 	deviceifc "jinr.ru/greenlab/go-adc/pkg/device/ifc"
 	"jinr.ru/greenlab/go-adc/pkg/srv/control/ifc"
 
@@ -44,7 +45,7 @@ type ControlServer struct {
 	seq     uint16
 	state   ifc.State
 	api     ifc.ApiServer
-	devices map[string]*pkgdevice.Device
+	devices map[string]deviceifc.Device
 }
 
 var _ ifc.ControlServer = &ControlServer{}
@@ -75,13 +76,18 @@ func NewControlServer(ctx context.Context, cfg *config.Config) (ifc.ControlServe
 		state: state,
 	}
 
-	devices := make(map[string]*pkgdevice.Device)
+	devices := make(map[string]deviceifc.Device)
 	for _, cfgDevice := range cfg.Devices {
-		device, newdevErr := pkgdevice.NewDevice(cfgDevice, s, state)
-		if newdevErr != nil {
-			return nil, err
+		switch cfgDevice.Type {
+		case config.ADC64Type:
+			device, newDevErr := adc64.NewDevice(cfgDevice, s, state)
+			if newDevErr != nil {
+				return nil, newDevErr
+			}
+			devices[cfgDevice.Name] = device
+		default:
+			return nil, errors.New(fmt.Sprintf("Wrong device type. Must be one of %s or %s", config.ADC64Type, config.TQDCType))
 		}
-		devices[cfgDevice.Name] = device
 	}
 	s.devices = devices
 
@@ -192,17 +198,23 @@ func (s *ControlServer) Run() error {
 	}()
 
 	// Periodically read all registers from all devices
+	// TODO: Implement as a device function
+	var adc64ops []*layers.RegOp
+	for i := adc64.RegAlias(0); i < adc64.RegAliasLimit; i++ {
+		addr := adc64.RegMap[i]
+		adc64ops = append(adc64ops, &layers.RegOp{Read: true, Reg: &layers.Reg{Addr: addr}})
+	}
+
 	go func() {
 		for {
-			var ops []*layers.RegOp
-			for i := pkgdevice.RegAlias(0); i < pkgdevice.RegAliasLimit; i++ {
-				addr := pkgdevice.RegMap[i]
-				ops = append(ops, &layers.RegOp{Read: true, Reg: &layers.Reg{Addr: addr}})
-			}
 			for _, device := range s.devices {
-				regreqErr := s.RegRequest(ops, device.IP)
-				if regreqErr != nil {
-					log.Error("Error while sending reg request to device %s", device.IP)
+				devType := device.GetType()
+				// TODO: Implement this on the device level
+				if devType == config.ADC64Type {
+					regReqErr := s.RegRequest(adc64ops, device.GetIP())
+					if regReqErr != nil {
+						log.Error("Error while sending reg request to device %s", device.GetIP())
+					}
 				}
 			}
 			time.Sleep(RegReadInterval * time.Second)
