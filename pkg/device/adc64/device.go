@@ -119,7 +119,9 @@ type Device struct {
 	InvertThresholdTrigger         bool
 	InvertZeroSupperssionThreshold bool
 	SoftwareZeroSuppression        bool
+	MStreamEnabled                 bool
 	dspParams                      *DspParams
+	Run                            bool
 	ctrl                           ifc.ControlServer
 	state                          ifc.State
 }
@@ -499,3 +501,15 @@ func (d *Device) WriteChCtrl(ch int) error {
 	d.WriteChReg(ch, MemMap[MemChBlcThrLo], uint32(-d.dspParams.BlcThr))
 	return nil
 }
+
+//func (d *Device) WriteSettings() error {
+//	if d.MStreamEnabled && ! d.Run {
+//		d.MStreamStop()
+//	}
+//
+//	// if there is difference between Device settings cache and real settings
+//	for i := 0; i < Nch; i++ {
+//		d.WriteChCtrl(i)
+//	}
+//	return nil
+//}
