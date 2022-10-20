@@ -158,3 +158,26 @@ func (s *State) GetRegAll(deviceName string) ([]*layers.Reg, error) {
 	}
 	return regs, nil
 }
+
+// GetRegs ...
+func (s *State) GetRegs(deviceName string, regsToGet []uint16) ([]*layers.Reg, error) {
+	log.Debug("Getting registers: device: %s registers: %v", deviceName, regsToGet)
+	var regs []*layers.Reg
+	if err := s.DB.View(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte(regBucketName(deviceName)))
+		if b == nil {
+			return errors.New(fmt.Sprintf("Bucket not found: %s", regBucketName(deviceName)))
+		}
+		for _, addr := range regsToGet {
+			valueBytes := b.Get(uint16ToByte(addr))
+			if valueBytes == nil {
+				return errors.New(fmt.Sprintf("Key not found: %d", addr))
+			}
+			regs = append(regs, &layers.Reg{Addr: addr, Value: binary.BigEndian.Uint16(valueBytes)})
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	return regs, nil
+}
