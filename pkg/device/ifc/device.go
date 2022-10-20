@@ -14,7 +14,11 @@
 
 package ifc
 
-import "jinr.ru/greenlab/go-adc/pkg/layers"
+import (
+	"net"
+
+	"jinr.ru/greenlab/go-adc/pkg/layers"
+)
 
 type Device interface {
 	MStreamStart() error
@@ -45,4 +49,7 @@ type Device interface {
 	IsRunning() (bool, error)
 
 	UpdateReg(reg *layers.Reg) error
+
+	GetName() string
+	GetIP() *net.IP
 }
