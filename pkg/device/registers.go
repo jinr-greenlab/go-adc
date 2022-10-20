@@ -12,7 +12,7 @@
  limitations under the License.
 */
 
-package adc64
+package device
 
 type RegAlias int
 

@@ -24,8 +24,3 @@ const (
 	DefaultIP            = "192.168.1.100"
 	DefaultLogLevel      = "info"
 )
-
-const (
-	ADC64Type = "adc64"
-	TQDCType  = "tqdc"
-)

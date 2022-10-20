@@ -12,11 +12,9 @@
  limitations under the License.
 */
 
-package adc64
+package device
 
 import (
-	"net"
-
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	deviceifc "jinr.ru/greenlab/go-adc/pkg/device/ifc"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
@@ -154,34 +152,15 @@ func NewDevice(device *config.Device, ctrl ifc.ControlServer, state ifc.State) (
 	return d, nil
 }
 
-// GetName ...
-func (d *Device) GetName() string {
-	return d.Name
-}
-
-// GetIP ...
-func (d *Device) GetIP() *net.IP {
-	return d.IP
-}
-
-// GetType ...
-func (d *Device) GetType() string {
-	return d.Type
-}
-
 // TODO: Read from state
 // RegRead ...
 func (d *Device) RegRead(addr uint16) (*layers.Reg, error) {
 	return d.state.GetReg(addr, d.Name)
 }
 
-// RegReadAll ...
+// RegRead ...
 func (d *Device) RegReadAll() ([]*layers.Reg, error) {
-	regs := []uint16{}
-	for _, addr := range RegMap {
-		regs = append(regs, addr)
-	}
-	return d.state.GetRegs(d.Name, regs)
+	return d.state.GetRegAll(d.Name)
 }
 
 // TODO: Write to state
