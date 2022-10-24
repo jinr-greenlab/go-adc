@@ -24,29 +24,29 @@ type Device interface {
 	MStreamStart() error
 	MStreamStop() error
 
-	SetTriggerTimer(val bool) error
-	SetTriggerThreshold(val bool) error
-	SetTriggerLemo(val bool) error
+	//SetTriggerTimer(val bool) error
+	//SetTriggerThreshold(val bool) error
+	//SetTriggerLemo(val bool) error
+	//
+	//SetMafSelector(val int) error
+	//SetMafBlcThresh(val int) error
 
-	SetMafSelector(val int) error
-	SetMafBlcThresh(val int) error
-
-	SetInvert(val bool) error
-
-	SetRoundoff(val uint16) error
-	SetFirCoef(val []uint16) error
-
-	SetWindowSize(val uint16) error
-	SetLatency(val uint16) error
-
-	SetChannels(val layers.ChannelsSetup) error
-
-	SetZs(val bool) error
+	//SetInvert(val bool) error
+	//
+	//SetRoundoff(val uint16) error
+	//SetFirCoef(val []uint16) error
+	//
+	//SetWindowSize(val uint16) error
+	//SetLatency(val uint16) error
+	//
+	//SetChannels(val layers.ChannelsSetup) error
+	//
+	//SetZs(val bool) error
 
 	RegRead(addr uint16) (*layers.Reg, error)
 	RegReadAll() ([]*layers.Reg, error)
 	RegWrite(reg *layers.Reg) error
-	IsRunning() (bool, error)
+	//IsRunning() (bool, error)
 
 	UpdateReg(reg *layers.Reg) error
 

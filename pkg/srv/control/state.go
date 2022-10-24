@@ -96,7 +96,7 @@ func (s *State) Close() {
 
 // SetReg ...
 func (s *State) SetReg(reg *layers.Reg, deviceName string) error {
-	log.Debug("Setting register: device: %s Addr: 0x%04x Value: 0x%04x", deviceName, reg.Addr, reg.Value)
+	log.Debug("Setting register to state: device: %s Addr: 0x%04x Value: 0x%04x", deviceName, reg.Addr, reg.Value)
 	if err := s.DB.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(regBucketName(deviceName)))
 		if b == nil {
@@ -114,7 +114,7 @@ func (s *State) SetReg(reg *layers.Reg, deviceName string) error {
 
 // GetReg ...
 func (s *State) GetReg(addr uint16, deviceName string) (*layers.Reg, error) {
-	log.Debug("Getting register: device: %s Addr: %x", deviceName, addr)
+	log.Debug("Getting register from state: device: %s Addr: %x", deviceName, addr)
 	var value uint16
 	if err := s.DB.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(regBucketName(deviceName)))
@@ -138,7 +138,7 @@ func (s *State) GetReg(addr uint16, deviceName string) (*layers.Reg, error) {
 
 // GetRegAll ...
 func (s *State) GetRegAll(deviceName string) ([]*layers.Reg, error) {
-	log.Debug("Getting all registers: device: %s", deviceName)
+	log.Debug("Getting all registers from state: device: %s", deviceName)
 	var regs []*layers.Reg
 	if err := s.DB.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(regBucketName(deviceName)))
@@ -161,7 +161,7 @@ func (s *State) GetRegAll(deviceName string) ([]*layers.Reg, error) {
 
 // GetRegs ...
 func (s *State) GetRegs(deviceName string, regsToGet []uint16) ([]*layers.Reg, error) {
-	log.Debug("Getting registers: device: %s registers: %v", deviceName, regsToGet)
+	log.Debug("Getting registers from state: device: %s registers: %v", deviceName, regsToGet)
 	var regs []*layers.Reg
 	if err := s.DB.View(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte(regBucketName(deviceName)))

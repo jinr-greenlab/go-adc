@@ -17,8 +17,6 @@ package layers
 import (
 	"encoding/binary"
 	"encoding/hex"
-	"sort"
-
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 
@@ -32,17 +30,18 @@ const (
 
 const (
 	MpdSyncMagic      = 0x2A502A50
-	MpdTimestampMagic = 0x3f60b8a8
+	MpdStartRunMagic  = 0x72617453
+	MpdStopRunMagic   = 0x706F7453
+	MpdRunNumberMagic = 0x236E7552
+	MpdRunIndexMagic  = 0x78646E49
 )
 
 // MpdLayer ...
 type MpdLayer struct {
 	layers.BaseLayer
-	*MpdTimestampHeader
 	*MpdEventHeader
 	*MpdDeviceHeader
-	Trigger *MStreamTrigger
-	Data    map[ChannelNum]*MStreamData
+	Data *MStreamData
 }
 
 var MpdLayerType = gopacket.RegisterLayerType(MpdLayerNum,
@@ -54,13 +53,6 @@ func (ms *MpdLayer) LayerType() gopacket.LayerType {
 }
 
 // lib-common/MpdRawTypes.h
-
-// MpdTimestampHeader ... // 16 bytes
-type MpdTimestampHeader struct {
-	Sync      uint32
-	Length    uint32
-	Timestamp uint64
-}
 
 // MpdEventHeader ... 12 bytes
 type MpdEventHeader struct {
@@ -76,22 +68,10 @@ type MpdDeviceHeader struct {
 	Length       uint32 // 24 bits // total length in bytes of all mstream blocks
 }
 
-// MpdMStreamHeader ... 4 bytes
+// MpdMStreamHeader ... 4 bytes (1 byte is unused)
 type MpdMStreamHeader struct {
-	Subtype           // 2 bits 0-1
-	Length     uint32 // 22 bits 2-23 // payload length in 32-bit words
-	ChannelNum        // 8 bits 24-31
-}
-
-// Serialize MpdEventHeader
-func (h *MpdTimestampHeader) Serialize(buf []byte) error {
-	log.Debug("MpdTimestampHeader.Serialize: Sync: %08x", h.Sync)
-	log.Debug("MpdTimestampHeader.Serialize: Length: %d", h.Length)
-	log.Debug("MpdTimestampHeader.Serialize: Timestamp: %d", h.Timestamp)
-	binary.LittleEndian.PutUint32(buf[0:4], h.Sync)
-	binary.LittleEndian.PutUint32(buf[4:8], h.Length)
-	binary.LittleEndian.PutUint64(buf[8:16], h.Timestamp)
-	return nil
+	Subtype        // 2 bits 0-1
+	Length  uint32 // 22 bits 2-23 // payload length in 32-bit words
 }
 
 // Serialize MpdEventHeader
@@ -121,22 +101,14 @@ func (h *MpdDeviceHeader) Serialize(buf []byte) error {
 func (h *MpdMStreamHeader) Serialize(buf []byte) error {
 	log.Debug("MpdMStreamHeader.Serialize: Subtype: %d", h.Subtype)
 	log.Debug("MpdMStreamHeader.Serialize: Length: %d", h.Length)
-	log.Debug("MpdMStreamHeader.Serialize: ChannelNum: %d", h.ChannelNum)
 	buf[0] = uint8(h.Length<<2) | uint8(h.Subtype&0x3)
 	binary.LittleEndian.PutUint16(buf[1:3], uint16(((h.Length<<2)&0xffff00)>>8))
-	buf[3] = uint8(h.ChannelNum)
+	buf[3] = uint8(0) // in ADC64 this is the channel number, in TQDC it is not used
 	return nil
 }
 
 // SerializeTo serializes the Mpd layer into bytes and writes the bytes to the SerializeBuffer
 func (mpd *MpdLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) error {
-	timestampHeaderBytes, err := b.AppendBytes(16)
-	if err != nil {
-		return err
-	}
-	mpd.MpdTimestampHeader.Serialize(timestampHeaderBytes)
-	log.Debug("MPD SerializeTo: MpdTimestampHeader:\n%s", hex.Dump(timestampHeaderBytes))
-
 	eventHeaderBytes, err := b.AppendBytes(12)
 	if err != nil {
 		return err
@@ -151,47 +123,20 @@ func (mpd *MpdLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.Seria
 	mpd.MpdDeviceHeader.Serialize(deviceHeaderBytes)
 	log.Debug("MPD SerializeTo: MpdDeviceHeader:\n%s", hex.Dump(deviceHeaderBytes))
 
-	triggerHeaderBytes, err := b.AppendBytes(4)
+	headerBytes, err := b.AppendBytes(4)
 	if err != nil {
 		return err
 	}
-	triggerHeader := &MpdMStreamHeader{
-		Subtype:    MStreamTriggerSubtype,
-		Length:     4,
-		ChannelNum: 0,
+	header := &MpdMStreamHeader{
+		Subtype: MStreamDataSubtype,
+		Length:  uint32(len(mpd.Data.Bytes) / 4),
 	}
-	triggerHeader.Serialize(triggerHeaderBytes)
-	log.Debug("MPD SerializeTo: MpdMStreamHeader: trigger:\n%s", hex.Dump(triggerHeaderBytes))
+	header.Serialize(headerBytes)
+	log.Debug("MPD SerializeTo: MpdMStreamHeader: data:\n%s", hex.Dump(headerBytes))
+	dataBytes, _ := b.AppendBytes(len(mpd.Data.Bytes))
 
-	triggerBytes, err := b.AppendBytes(16)
-	if err != nil {
-		return err
-	}
-	mpd.Trigger.Serialize(triggerBytes)
-	log.Debug("MPD SerializeTo: trigger:\n%s", hex.Dump(triggerBytes))
-
-	channels := []ChannelNum{}
-	for c := range mpd.Data {
-		channels = append(channels, c)
-	}
-	sort.Slice(channels, func(i, j int) bool { return channels[i] < channels[j] })
-	for _, c := range channels {
-		headerBytes, err := b.AppendBytes(4)
-		if err != nil {
-			return err
-		}
-		header := &MpdMStreamHeader{
-			Subtype:    MStreamDataSubtype,
-			Length:     uint32(len(mpd.Data[c].Bytes) / 4),
-			ChannelNum: c,
-		}
-		header.Serialize(headerBytes)
-		log.Debug("MPD SerializeTo: MpdMStreamHeader: data:\n%s", hex.Dump(headerBytes))
-		dataBytes, _ := b.AppendBytes(len(mpd.Data[c].Bytes))
-
-		mpd.Data[c].Serialize(dataBytes)
-		log.Debug("MPD SerializeTo: data:\n%s", hex.Dump(dataBytes))
-	}
+	mpd.Data.Serialize(dataBytes)
+	log.Debug("MPD SerializeTo: data:\n%s", hex.Dump(dataBytes))
 
 	return nil
 }

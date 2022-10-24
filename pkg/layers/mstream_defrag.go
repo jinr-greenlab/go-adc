@@ -201,7 +201,7 @@ func (m *FragmentBuilderManager) Init() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	log.Info("Initializing fragment builder manager: %s", m.deviceName)
-	for i := 0; i < 65536; i++ {
+	for i := 0; i < 65536; i++ { // fragment id is 16-bit number
 		m.fragmentBuilders[i] = NewFragmentBuilder(m, uint16(i), m.closeCh)
 	}
 	log.Info("Init last closed fragment to 65535")

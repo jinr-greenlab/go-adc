@@ -15,10 +15,44 @@
 package mstream
 
 import (
+	"encoding/binary"
 	"os"
 
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
+
+const (
+	MpdStartRunMagic  = 0x72617453
+	MpdStopRunMagic   = 0x706F7453
+	MpdRunNumberMagic = 0x236E7552
+	MpdRunIndexMagic  = 0x78646E49
+)
+
+// MpdStartRunHeader ...
+func MpdStartRunHeader() []byte {
+	buf := make([]byte, 28)
+	binary.LittleEndian.PutUint32(buf[0:4], MpdStartRunMagic)   // start run sync
+	binary.LittleEndian.PutUint32(buf[4:8], 0x14)               // start run header length
+	binary.LittleEndian.PutUint32(buf[8:12], MpdRunNumberMagic) // run number sync
+	binary.LittleEndian.PutUint32(buf[12:16], 0x04)             // run number length
+	binary.LittleEndian.PutUint32(buf[16:20], 0)                // run number
+	binary.LittleEndian.PutUint32(buf[20:24], MpdRunIndexMagic) // run index sync
+	binary.LittleEndian.PutUint32(buf[24:28], 0)                // run index
+	return buf
+}
+
+// MpdStopRunHeader ...
+func MpdStopRunHeader() []byte {
+	buf := make([]byte, 28)
+	binary.LittleEndian.PutUint32(buf[0:4], MpdStopRunMagic)    // stop run sync
+	binary.LittleEndian.PutUint32(buf[4:8], 0x14)               // stop run header length
+	binary.LittleEndian.PutUint32(buf[8:12], MpdRunNumberMagic) // run number sync
+	binary.LittleEndian.PutUint32(buf[12:16], 0x04)             // run number length
+	binary.LittleEndian.PutUint32(buf[16:20], 0)                // run number
+	binary.LittleEndian.PutUint32(buf[20:24], MpdRunIndexMagic) // run index sync
+	binary.LittleEndian.PutUint32(buf[24:28], 0)                // run index
+	return buf
+}
 
 type Writer struct {
 	file *os.File
@@ -30,9 +64,11 @@ func NewWriter(filename string) (*Writer, error) {
 		log.Error("Error while creating file: %s", filename)
 		return nil, err
 	}
-	return &Writer{
+	writer := &Writer{
 		file: file,
-	}, nil
+	}
+	writer.file.Write(MpdStartRunHeader())
+	return writer, nil
 }
 
 func (w *Writer) Write(buf []byte) (int, error) {
@@ -40,6 +76,7 @@ func (w *Writer) Write(buf []byte) (int, error) {
 }
 
 func (w *Writer) Flush() {
+	w.file.Write(MpdStopRunHeader())
 	w.file.Sync()
 	w.file.Close()
 }

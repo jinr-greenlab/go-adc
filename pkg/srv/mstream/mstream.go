@@ -46,7 +46,6 @@ type MStreamServer struct {
 	writers        map[string]io.Writer
 	writerChs      map[string]chan []byte
 	writerStateChs map[string]chan string
-	fragmentChs    map[string]chan *layers.MStreamFragment
 }
 
 func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, error) {
@@ -68,7 +67,6 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 		writers:        make(map[string]io.Writer),
 		writerChs:      make(map[string]chan []byte),
 		writerStateChs: make(map[string]chan string),
-		fragmentChs:    make(map[string]chan *layers.MStreamFragment),
 	}
 
 	for _, device := range cfg.Devices {
@@ -76,7 +74,6 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 		s.writers[device.Name] = io.Discard
 		s.writerChs[device.Name] = make(chan []byte, WriterChSize)
 		s.writerStateChs[device.Name] = make(chan string)
-		s.fragmentChs[device.Name] = make(chan *layers.MStreamFragment, FragmentChSize)
 	}
 
 	apiServer, err := NewApiServer(ctx, cfg, s)
@@ -151,11 +148,6 @@ func (s *MStreamServer) Run() error {
 	// Read packets from input queue and handle them properly
 	for _, device := range s.Config.Devices {
 		deviceName := device.Name
-		eventBuilder := NewEventBuilder(
-			deviceName,
-			s.fragmentChs[deviceName],
-			s.writerChs[deviceName],
-		)
 
 		// Run mpd writers
 		go func() {
@@ -193,16 +185,8 @@ func (s *MStreamServer) Run() error {
 			}
 		}()
 
-		// Run event builders
-		go func() {
-			eventBuilder.Run()
-		}()
-
 		// Run parsers
 		go func() {
-			fragmentBuilderManager := layers.NewFragmentBuilderManager(deviceName, s.fragmentChs[deviceName])
-			fragmentBuilderManager.Init()
-
 			source := gopacket.NewPacketSource(s.packetSources[deviceName], layers.MLinkLayerType)
 			for packet := range source.Packets() {
 				var mlSeq uint16
@@ -232,11 +216,18 @@ func (s *MStreamServer) Run() error {
 								f.FragmentID, f.FragmentOffset, f.FragmentLength)
 						}
 
-						if f.Subtype == layers.MStreamTriggerSubtype && !f.LastFragment() {
-							log.Error("!!! Something really bad is happening. Trigger data is fragmented.")
-							continue
+						if !f.LastFragment() || f.FragmentOffset != 0 {
+							panic("!!! Something really bad is happening. Data is fragmented.")
 						}
-						fragmentBuilderManager.SetFragment(f)
+
+						// defragmentation and event building are not needed
+						if dperr := f.DecodePayload(); dperr != nil {
+							panic(
+								fmt.Sprintf("!!! Error while decoding mstream fragment payload. %s %d error: %s",
+									deviceName, f.FragmentID, dperr))
+						}
+
+						SetFragment(f, s.writerChs[deviceName])
 					}
 				}
 			}
