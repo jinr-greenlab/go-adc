@@ -57,6 +57,7 @@ type MStreamFragment struct {
 	// DeviceID is the ADC64 device model identifier
 	// 0xd9 for ADC64VE-XGE
 	// 0xdf for ADC64VE-V3-XG
+	// 0xd6 for TQDC
 	DeviceID       uint8
 	FragmentID     uint16
 	FragmentOffset uint16

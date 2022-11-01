@@ -82,7 +82,7 @@ func (b *FragmentBuilder) Clear() {
 }
 
 func (b *FragmentBuilder) CloseFragment() {
-	log.Info("Close fragment: %s %d", b.mgr.deviceName, b.FragmentID)
+	log.Debug("Close fragment: %s %d", b.mgr.deviceName, b.FragmentID)
 	defer b.Clear()
 
 	var data []byte
@@ -121,7 +121,6 @@ func (b *FragmentBuilder) CloseFragment() {
 	}
 
 	b.closeCh <- assembled
-	b.mgr.SetLastClosedFragment(b.FragmentID)
 }
 
 func (b *FragmentBuilder) SetFragment(f *MStreamFragment) {
@@ -172,7 +171,7 @@ func (b *FragmentBuilder) SetFragment(f *MStreamFragment) {
 		b.Completed = true
 	}
 
-	if b.Completed && (b.mgr.GetLastClosedFragment()+1) == b.FragmentID {
+	if b.Completed {
 		b.CloseFragment()
 	}
 }
@@ -192,7 +191,7 @@ func NewFragmentBuilderManager(deviceName string, closeCh chan<- *MStreamFragmen
 	log.Info("Creating FragmentBuilderManager: %s", deviceName)
 	return &FragmentBuilderManager{
 		deviceName:       deviceName,
-		fragmentBuilders: make([]*FragmentBuilder, 65536),
+		fragmentBuilders: make([]*FragmentBuilder, 65536), // fragmentID is uint16 number, thus 65536
 		closeCh:          closeCh,
 	}
 }
@@ -204,18 +203,6 @@ func (m *FragmentBuilderManager) Init() {
 	for i := 0; i < 65536; i++ { // fragment id is 16-bit number
 		m.fragmentBuilders[i] = NewFragmentBuilder(m, uint16(i), m.closeCh)
 	}
-	log.Info("Init last closed fragment to 65535")
-	m.SetLastClosedFragment(65535)
-	log.Info("Done initializing fragment builder manager: %s", m.deviceName)
-}
-
-func (m *FragmentBuilderManager) GetLastClosedFragment() uint16 {
-	return m.lastClosedFragment
-}
-
-func (m *FragmentBuilderManager) SetLastClosedFragment(fragmentID uint16) {
-	log.Info("Set last closed fragment: %s %d", m.deviceName, fragmentID)
-	m.lastClosedFragment = fragmentID
 }
 
 func (m *FragmentBuilderManager) SetFragment(f *MStreamFragment) {

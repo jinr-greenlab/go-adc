@@ -21,9 +21,24 @@ import (
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
+type EventBuilder struct {
+	DeviceName string
+	FragmentCh <-chan *layers.MStreamFragment
+	mpdCh      chan<- []byte
+}
+
+// NewEventBuilder ...
+func NewEventBuilder(deviceName string, fragmentCh <-chan *layers.MStreamFragment, mpdCh chan<- []byte) *EventBuilder {
+	return &EventBuilder{
+		DeviceName: deviceName,
+		FragmentCh: fragmentCh,
+		mpdCh:      mpdCh,
+	}
+}
+
 // SetFragment ...
 // fragment payload must be decoded before calling this function
-func SetFragment(f *layers.MStreamFragment, mpdCh chan<- []byte) {
+func (b *EventBuilder) SetFragment(f *layers.MStreamFragment) {
 	// We substruct 8 bytes from the fragment length because fragment payload
 	// includes MStreamPayloadHeader which is not included in MPD data
 	length := uint32(f.FragmentLength - 8)
@@ -55,5 +70,15 @@ func SetFragment(f *layers.MStreamFragment, mpdCh chan<- []byte) {
 		return
 	}
 
-	mpdCh <- buf.Bytes()
+	b.mpdCh <- buf.Bytes()
+}
+
+// Run ...
+func (b *EventBuilder) Run() {
+	log.Info("Run EventBuilder: device: %s", b.DeviceName)
+	for {
+		f := <-b.FragmentCh
+		log.Debug("Setting event fragment: device %s event: %d", b.DeviceName, f.MStreamPayloadHeader.EventNum)
+		b.SetFragment(f)
+	}
 }
