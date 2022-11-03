@@ -18,6 +18,7 @@ import (
 	"container/list"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
+	"time"
 )
 
 const (
@@ -216,8 +217,14 @@ func (m *DefragManager) Run() error {
 		}(i)
 	}
 	log.Info("Fragment builders initialized: %s", m.deviceName)
+	var f *layers.MStreamFragment
 	for {
-		f := <-m.FragmentedCh
+		select {
+		case f = <-m.FragmentedCh:
+		case <-time.After(10 * time.Millisecond):
+			log.Info("Timeout in fragment manager: %s", m.deviceName)
+			f = <-m.FragmentedCh
+		}
 		log.Debug("Send fragment part: %s %d offset: %d length: %d last: %t",
 			m.deviceName, f.FragmentID, f.FragmentOffset, f.FragmentLength, f.LastFragment())
 		m.fragmentBuilders[f.FragmentID].FragmentedCh <- f

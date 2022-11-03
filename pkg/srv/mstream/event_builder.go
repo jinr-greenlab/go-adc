@@ -16,6 +16,7 @@ package mstream
 
 import (
 	"github.com/google/gopacket"
+	"time"
 
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
@@ -76,8 +77,14 @@ func (b *EventBuilder) HandleFragment(f *layers.MStreamFragment) {
 // Run ...
 func (b *EventBuilder) Run() {
 	log.Info("Run event builder: %s", b.deviceName)
+	var f *layers.MStreamFragment
 	for {
-		f := <-b.defragmentedCh
+		select {
+		case f = <-b.defragmentedCh:
+		case <-time.After(10 * time.Millisecond):
+			log.Info("Timeout in event builder: %s", b.deviceName)
+			f = <-b.defragmentedCh
+		}
 		log.Debug("Setting event fragment: device %s event: %d", b.deviceName, f.MStreamPayloadHeader.EventNum)
 		b.HandleFragment(f)
 	}

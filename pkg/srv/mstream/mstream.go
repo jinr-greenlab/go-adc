@@ -206,9 +206,17 @@ func (s *MStreamServer) Run() error {
 		}(defragManager)
 
 		// Run parsers
-		go func(packetDataSource *PacketSource, fragmentedCh chan<- *layers.MStreamFragment) {
+		go func(deviceName string, packetDataSource *PacketSource, fragmentedCh chan<- *layers.MStreamFragment) {
 			source := gopacket.NewPacketSource(packetDataSource, layers.MLinkLayerType)
-			for packet := range source.Packets() {
+			packetsCh := source.Packets()
+			var packet gopacket.Packet
+			for {
+				select {
+				case packet = <-packetsCh:
+				case <-time.After(10 * time.Millisecond):
+					log.Info("Timeout in parser: %s", deviceName)
+					packet = <-packetsCh
+				}
 				var mlSeq uint16
 				var mlSrc uint16
 				var mlDst uint16
@@ -244,7 +252,7 @@ func (s *MStreamServer) Run() error {
 					}
 				}
 			}
-		}(s.packetDataSources[deviceName], s.fragmentedChs[deviceName])
+		}(deviceName, s.packetDataSources[deviceName], s.fragmentedChs[deviceName])
 	}
 
 	go func() {
