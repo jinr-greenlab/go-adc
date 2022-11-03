@@ -22,23 +22,23 @@ import (
 )
 
 type EventBuilder struct {
-	DeviceName string
-	FragmentCh <-chan *layers.MStreamFragment
-	mpdCh      chan<- []byte
+	deviceName     string
+	defragmentedCh <-chan *layers.MStreamFragment
+	writerCh       chan<- []byte
 }
 
 // NewEventBuilder ...
-func NewEventBuilder(deviceName string, fragmentCh <-chan *layers.MStreamFragment, mpdCh chan<- []byte) *EventBuilder {
+func NewEventBuilder(deviceName string, defragmentedCh <-chan *layers.MStreamFragment, writerCh chan<- []byte) *EventBuilder {
 	return &EventBuilder{
-		DeviceName: deviceName,
-		FragmentCh: fragmentCh,
-		mpdCh:      mpdCh,
+		deviceName:     deviceName,
+		defragmentedCh: defragmentedCh,
+		writerCh:       writerCh,
 	}
 }
 
 // SetFragment ...
 // fragment payload must be decoded before calling this function
-func (b *EventBuilder) SetFragment(f *layers.MStreamFragment) {
+func (b *EventBuilder) HandleFragment(f *layers.MStreamFragment) {
 	// We substruct 8 bytes from the fragment length because fragment payload
 	// includes MStreamPayloadHeader which is not included in MPD data
 	length := uint32(f.FragmentLength - 8)
@@ -70,15 +70,15 @@ func (b *EventBuilder) SetFragment(f *layers.MStreamFragment) {
 		return
 	}
 
-	b.mpdCh <- buf.Bytes()
+	b.writerCh <- buf.Bytes()
 }
 
 // Run ...
 func (b *EventBuilder) Run() {
-	log.Info("Run EventBuilder: device: %s", b.DeviceName)
+	log.Info("Run event builder: %s", b.deviceName)
 	for {
-		f := <-b.FragmentCh
-		log.Debug("Setting event fragment: device %s event: %d", b.DeviceName, f.MStreamPayloadHeader.EventNum)
-		b.SetFragment(f)
+		f := <-b.defragmentedCh
+		log.Debug("Setting event fragment: device %s event: %d", b.deviceName, f.MStreamPayloadHeader.EventNum)
+		b.HandleFragment(f)
 	}
 }

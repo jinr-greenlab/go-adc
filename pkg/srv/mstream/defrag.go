@@ -12,18 +12,17 @@
  limitations under the License.
 */
 
-package layers
+package mstream
 
 import (
 	"container/list"
-	"sync"
-
+	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
 const (
-	// TODO figure out whether there is fragmentation limit
-	MaxFragmentsListLength = 100
+	MaxFragmentsListLength          = 100
+	FragmentBuilderFragmentedChSize = 100
 )
 
 /*
@@ -40,18 +39,20 @@ type FragmentBuilder struct {
 	FragmentID uint16
 	DeviceID   uint8
 	Flags      uint8
-	Subtype
+	layers.Subtype
 	Free                 bool
 	Parts                *list.List
 	Highest              uint16
 	TotalLength          uint16
 	LastFragmentReceived bool
 	Completed            bool
-	closeCh              chan<- *MStreamFragment
-	mgr                  *FragmentBuilderManager
+	FragmentedCh         chan *layers.MStreamFragment
+	defragmentedCh       chan<- *layers.MStreamFragment
+	mgr                  *DefragManager
 }
 
-func NewFragmentBuilder(mgr *FragmentBuilderManager, fragmentId uint16, closeCh chan<- *MStreamFragment) *FragmentBuilder {
+func NewFragmentBuilder(mgr *DefragManager, fragmentId uint16, defragmentedCh chan<- *layers.MStreamFragment) *FragmentBuilder {
+	fragmentedCh := make(chan *layers.MStreamFragment, FragmentBuilderFragmentedChSize)
 	return &FragmentBuilder{
 		mgr:                  mgr,
 		FragmentID:           fragmentId,
@@ -64,12 +65,13 @@ func NewFragmentBuilder(mgr *FragmentBuilderManager, fragmentId uint16, closeCh 
 		TotalLength:          0,
 		LastFragmentReceived: false,
 		Completed:            false,
-		closeCh:              closeCh,
+		FragmentedCh:         fragmentedCh,
+		defragmentedCh:       defragmentedCh,
 	}
 }
 
 func (b *FragmentBuilder) Clear() {
-	log.Info("Clear fragment builder: %s %d", b.mgr.deviceName, b.FragmentID)
+	log.Debug("Clear fragment builder: %s %d", b.mgr.deviceName, b.FragmentID)
 	b.Free = true
 	b.DeviceID = 0
 	b.Flags = 0
@@ -81,8 +83,8 @@ func (b *FragmentBuilder) Clear() {
 	b.Completed = false
 }
 
-func (b *FragmentBuilder) CloseFragment() {
-	log.Debug("Close fragment: %s %d", b.mgr.deviceName, b.FragmentID)
+func (b *FragmentBuilder) AssembleFragment() {
+	log.Debug("Assemble fragment: %s %d", b.mgr.deviceName, b.FragmentID)
 	defer b.Clear()
 
 	var data []byte
@@ -90,9 +92,9 @@ func (b *FragmentBuilder) CloseFragment() {
 
 	for e := b.Parts.Front(); e != nil; e = e.Next() {
 		// we don't check the error here since the list contains only MStream fragments
-		f, _ := e.Value.(*MStreamFragment)
+		f, _ := e.Value.(*layers.MStreamFragment)
 		if f.FragmentOffset == currentOffset { // First fragment must have offset = 0
-			log.Debug("CloseFragment: %s fragment: %d offset: %d",
+			log.Debug("AssembleFragment: %s fragment: %d offset: %d",
 				b.mgr.deviceName, b.FragmentID, f.FragmentOffset)
 			data = append(data, f.Data...)
 			currentOffset += f.FragmentLength
@@ -103,7 +105,7 @@ func (b *FragmentBuilder) CloseFragment() {
 		}
 	}
 
-	assembled := &MStreamFragment{
+	assembled := &layers.MStreamFragment{
 		DeviceID:       b.DeviceID,
 		Flags:          b.Flags,
 		Subtype:        b.Subtype,
@@ -120,10 +122,10 @@ func (b *FragmentBuilder) CloseFragment() {
 		return
 	}
 
-	b.closeCh <- assembled
+	b.defragmentedCh <- assembled
 }
 
-func (b *FragmentBuilder) SetFragment(f *MStreamFragment) {
+func (b *FragmentBuilder) HandleFragmentPart(f *layers.MStreamFragment) {
 	if b.Free {
 		b.Free = false
 		b.DeviceID = f.DeviceID
@@ -136,7 +138,7 @@ func (b *FragmentBuilder) SetFragment(f *MStreamFragment) {
 	} else {
 		for e := b.Parts.Front(); e != nil; e = e.Next() {
 			// we don't check the error here the list contains only MStream fragments
-			frag, _ := e.Value.(*MStreamFragment)
+			frag, _ := e.Value.(*layers.MStreamFragment)
 
 			if f.FragmentOffset == frag.FragmentOffset {
 				log.Debug("Fragment duplication: %s %d",
@@ -172,42 +174,53 @@ func (b *FragmentBuilder) SetFragment(f *MStreamFragment) {
 	}
 
 	if b.Completed {
-		b.CloseFragment()
+		b.AssembleFragment()
 	}
 }
 
-type FragmentBuilderManager struct {
-	mu         sync.RWMutex
-	deviceName string
-	// fragmentBuilders field is an in memory buffer which is used to store
-	// MStream fragment parts as they are received and until we are
-	// able to assemble them
-	fragmentBuilders   []*FragmentBuilder
-	closeCh            chan<- *MStreamFragment
-	lastClosedFragment uint16
+func (b *FragmentBuilder) Run() error {
+	log.Debug("Run fragment builder: device: %s fragment id: 0x%04x", b.mgr.deviceName, b.FragmentID)
+	for {
+		f := <-b.FragmentedCh
+		b.HandleFragmentPart(f)
+	}
+	return nil
 }
 
-func NewFragmentBuilderManager(deviceName string, closeCh chan<- *MStreamFragment) *FragmentBuilderManager {
-	log.Info("Creating FragmentBuilderManager: %s", deviceName)
-	return &FragmentBuilderManager{
+type DefragManager struct {
+	deviceName       string
+	fragmentBuilders []*FragmentBuilder
+	FragmentedCh     <-chan *layers.MStreamFragment
+	DefragmentedCh   chan<- *layers.MStreamFragment
+}
+
+func NewDefragManager(
+	deviceName string,
+	fragmentedCh <-chan *layers.MStreamFragment,
+	defragmentedCh chan<- *layers.MStreamFragment,
+) *DefragManager {
+	return &DefragManager{
 		deviceName:       deviceName,
-		fragmentBuilders: make([]*FragmentBuilder, 65536), // fragmentID is uint16 number, thus 65536
-		closeCh:          closeCh,
+		fragmentBuilders: make([]*FragmentBuilder, 65536), // fragment id is uint16 number, thus 65536
+		FragmentedCh:     fragmentedCh,
+		DefragmentedCh:   defragmentedCh,
 	}
 }
 
-func (m *FragmentBuilderManager) Init() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	log.Info("Initializing fragment builder manager: %s", m.deviceName)
-	for i := 0; i < 65536; i++ { // fragment id is 16-bit number
-		m.fragmentBuilders[i] = NewFragmentBuilder(m, uint16(i), m.closeCh)
+func (m *DefragManager) Run() error {
+	log.Info("Run defrag manager: %s", m.deviceName)
+	for i := 0; i < 65536; i++ { // fragment id is uint16 number
+		m.fragmentBuilders[i] = NewFragmentBuilder(m, uint16(i), m.DefragmentedCh)
+		go func(i int) {
+			m.fragmentBuilders[i].Run()
+		}(i)
 	}
-}
-
-func (m *FragmentBuilderManager) SetFragment(f *MStreamFragment) {
-	log.Info("Setting fragment part: %s %d offset: %d length: %d last: %t",
-		m.deviceName, f.FragmentID, f.FragmentOffset, f.FragmentLength, f.LastFragment())
-
-	m.fragmentBuilders[f.FragmentID].SetFragment(f)
+	log.Info("Fragment builders initialized: %s", m.deviceName)
+	for {
+		f := <-m.FragmentedCh
+		log.Debug("Send fragment part: %s %d offset: %d length: %d last: %t",
+			m.deviceName, f.FragmentID, f.FragmentOffset, f.FragmentLength, f.LastFragment())
+		m.fragmentBuilders[f.FragmentID].FragmentedCh <- f
+	}
+	return nil
 }

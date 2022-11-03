@@ -12,13 +12,14 @@ TIMESTAMP ?= $(shell date +%Y%m%d%H%M%S)
 COMMIT    ?= $(shell git rev-parse HEAD)
 
 docker-build:
-	docker build --rm -t go-adc:latest .
+	docker build --rm -t go-adc:tqdc .
 
 docker-pub:
-	docker tag go-adc:latest ${DOCKER_IMAGE}:tqdc
+	docker tag go-adc:tqdc ${DOCKER_IMAGE}:tqdc
 #	docker tag go-adc:latest ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
 #	@echo docker push ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
-	@echo docker push ${DOCKER_IMAGE}:tqdc
+#	@echo docker push ${DOCKER_IMAGE}:tqdc
+	docker push ${DOCKER_IMAGE}:tqdc
 
 # linting
 LINTER              := golangci-lint

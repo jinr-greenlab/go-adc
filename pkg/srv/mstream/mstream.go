@@ -33,10 +33,11 @@ import (
 )
 
 const (
-	MStreamPort    = 33301
-	WriterChSize   = 100
-	FragmentChSize = 100
-	InChSize       = 100
+	MStreamPort        = 33301
+	WriterChSize       = 100
+	FragmentedChSize   = 100
+	DefragmentedChSize = 100
+	InChSize           = 100
 )
 
 const (
@@ -47,10 +48,10 @@ type MStreamServer struct {
 	srv.Server
 	api               *ApiServer
 	packetDataSources map[string]*PacketSource
-	writers           map[string]io.Writer
 	writerChs         map[string]chan []byte
 	writerStateChs    map[string]chan string
-	fragmentChs       map[string]chan *layers.MStreamFragment
+	fragmentedChs     map[string]chan *layers.MStreamFragment
+	defragmentedChs   map[string]chan *layers.MStreamFragment
 }
 
 func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, error) {
@@ -69,18 +70,18 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 			ChOut:   make(chan srv.OutPacket),
 		},
 		packetDataSources: make(map[string]*PacketSource),
-		writers:           make(map[string]io.Writer),
 		writerChs:         make(map[string]chan []byte),
 		writerStateChs:    make(map[string]chan string),
-		fragmentChs:       make(map[string]chan *layers.MStreamFragment),
+		fragmentedChs:     make(map[string]chan *layers.MStreamFragment),
+		defragmentedChs:   make(map[string]chan *layers.MStreamFragment),
 	}
 
 	for _, device := range cfg.Devices {
 		s.packetDataSources[device.Name] = NewPacketSource()
-		s.writers[device.Name] = io.Discard
 		s.writerChs[device.Name] = make(chan []byte, WriterChSize)
 		s.writerStateChs[device.Name] = make(chan string)
-		s.fragmentChs[device.Name] = make(chan *layers.MStreamFragment, FragmentChSize)
+		s.fragmentedChs[device.Name] = make(chan *layers.MStreamFragment, FragmentedChSize)
+		s.defragmentedChs[device.Name] = make(chan *layers.MStreamFragment, DefragmentedChSize)
 	}
 
 	apiServer, err := NewApiServer(ctx, cfg, s)
@@ -155,40 +156,36 @@ func (s *MStreamServer) Run() error {
 	// Read packets from input queue and handle them properly
 	for _, device := range s.Config.Devices {
 		deviceName := device.Name
-
-		eventBuilder := NewEventBuilder(
-			deviceName,
-			s.fragmentChs[deviceName],
-			s.writerChs[deviceName],
-		)
+		defragManager := NewDefragManager(deviceName, s.fragmentedChs[deviceName], s.defragmentedChs[deviceName])
+		eventBuilder := NewEventBuilder(deviceName, s.defragmentedChs[deviceName], s.writerChs[deviceName])
 
 		// Run mpd writers
-		go func() {
+		go func(writerStateCh <-chan string, writerCh <-chan []byte) {
 			currentFilename := ""
+			writer := io.Discard
 			for {
 				select {
-				case filename := <-s.writerStateChs[deviceName]:
-
+				case filename := <-writerStateCh:
 					if currentFilename != "" {
-						w := s.writers[deviceName].(*Writer)
+						w := writer.(*Writer)
 						w.Flush()
 					}
 					if filename == "" {
-						s.writers[deviceName] = io.Discard
+						writer = io.Discard
 					} else {
 						w, newWriterErr := NewWriter(filename)
 						if newWriterErr != nil {
 							log.Error("Error while creating writer: %s", err)
 							continue
 						}
-						s.writers[deviceName] = w
+						writer = w
 					}
 					currentFilename = filename
 				default:
 				}
 				select {
-				case bytes := <-s.writerChs[deviceName]:
-					_, writeErr := s.writers[deviceName].Write(bytes)
+				case bytes := <-writerCh:
+					_, writeErr := writer.Write(bytes)
 					if writeErr != nil {
 						log.Error("Error while writing to file: %s", err)
 					}
@@ -196,19 +193,21 @@ func (s *MStreamServer) Run() error {
 					time.Sleep(10 * time.Millisecond)
 				}
 			}
-		}()
+		}(s.writerStateChs[deviceName], s.writerChs[deviceName])
 
 		// Run event builders
-		go func() {
+		go func(eventBuilder *EventBuilder) {
 			eventBuilder.Run()
-		}()
+		}(eventBuilder)
+
+		// Run defragmenter manager
+		go func(defragManager *DefragManager) {
+			defragManager.Run()
+		}(defragManager)
 
 		// Run parsers
-		go func() {
-			fragmentBuilderManager := layers.NewFragmentBuilderManager(deviceName, s.fragmentChs[deviceName])
-			fragmentBuilderManager.Init()
-
-			source := gopacket.NewPacketSource(s.packetDataSources[deviceName], layers.MLinkLayerType)
+		go func(packetDataSource *PacketSource, fragmentedCh chan<- *layers.MStreamFragment) {
+			source := gopacket.NewPacketSource(packetDataSource, layers.MLinkLayerType)
 			for packet := range source.Packets() {
 				var mlSeq uint16
 				var mlSrc uint16
@@ -235,7 +234,7 @@ func (s *MStreamServer) Run() error {
 						log.Debug("Handling fragment: FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t",
 							f.FragmentID, f.FragmentOffset, f.LastFragment())
 
-						fragmentBuilderManager.SetFragment(f)
+						fragmentedCh <- f
 
 						ackErr := s.SendAck(mlDst, mlSrc, mlSeq, f.FragmentID, f.FragmentOffset, udpaddr)
 						if ackErr != nil {
@@ -245,7 +244,7 @@ func (s *MStreamServer) Run() error {
 					}
 				}
 			}
-		}()
+		}(s.packetDataSources[deviceName], s.fragmentedChs[deviceName])
 	}
 
 	go func() {
@@ -320,7 +319,7 @@ func (s *MStreamServer) ConnectToDevices() error {
 	return nil
 }
 
-func (s *MStreamServer) persistFilename(dir, prefix, name, suffix string) string {
+func PersistFilename(dir, prefix, name, suffix string) string {
 	filename := fmt.Sprintf("%s_%s.data", name, suffix)
 	if prefix != "" {
 		filename = fmt.Sprintf("%s_%s", prefix, filename)
@@ -339,7 +338,7 @@ func (s *MStreamServer) Persist(dir, filePrefix string) {
 	timestamp := time.Now().Format("20060102_150405")
 	for _, device := range s.Config.Devices {
 		log.Info("Persist writer: %s", device.Name)
-		filename := s.persistFilename(dir, filePrefix, device.Name, timestamp)
+		filename := PersistFilename(dir, filePrefix, device.Name, timestamp)
 		s.writerStateChs[device.Name] <- filename
 	}
 }
