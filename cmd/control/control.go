@@ -33,6 +33,5 @@ func NewCommand() *cobra.Command {
 	cmd.AddCommand(reg.NewRegCommand())
 	cmd.AddCommand(NewMStreamCommand())
 	cmd.AddCommand(NewStartCommand())
-
 	return cmd
 }

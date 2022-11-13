@@ -18,7 +18,6 @@ import (
 	"container/list"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
-	"time"
 )
 
 const (
@@ -135,15 +134,17 @@ func (b *FragmentBuilder) HandleFragmentPart(f *layers.MStreamFragment) {
 	}
 
 	if f.FragmentOffset >= b.Highest {
+		log.Debug("Fragment append: %s %04x %04x", b.mgr.deviceName, b.FragmentID, f.FragmentOffset)
 		b.Parts.PushBack(f)
 	} else {
+		log.Debug("Fragment not in order: %s %04x %04x", b.mgr.deviceName, b.FragmentID, f.FragmentOffset)
 		for e := b.Parts.Front(); e != nil; e = e.Next() {
 			// we don't check the error here the list contains only MStream fragments
 			frag, _ := e.Value.(*layers.MStreamFragment)
 
 			if f.FragmentOffset == frag.FragmentOffset {
-				log.Debug("Fragment duplication: %s %d",
-					b.mgr.deviceName, b.FragmentID)
+				log.Debug("Fragment duplication: %s %04x %04x",
+					b.mgr.deviceName, b.FragmentID, f.FragmentOffset)
 				return
 			}
 
@@ -160,7 +161,7 @@ func (b *FragmentBuilder) HandleFragmentPart(f *layers.MStreamFragment) {
 	}
 	b.TotalLength += f.FragmentLength
 
-	log.Debug("Fragment builder: %s %d state: count: %d highest: %d total: %d",
+	log.Debug("Fragment builder: %s %04x state: count: %d highest: %d total: %d",
 		b.mgr.deviceName, b.FragmentID, b.Parts.Len(), b.Highest, b.TotalLength)
 
 	if f.LastFragment() {
@@ -170,7 +171,7 @@ func (b *FragmentBuilder) HandleFragmentPart(f *layers.MStreamFragment) {
 	// Last fragment received and the total length of all fragments corresponds
 	// to the end of the last fragment which means there are no missing fragments.
 	if b.LastFragmentReceived && b.Highest == b.TotalLength {
-		log.Info("Fragment completed: %s %d", b.mgr.deviceName, b.FragmentID)
+		log.Debug("Fragment completed: %s %04x", b.mgr.deviceName, b.FragmentID)
 		b.Completed = true
 	}
 
@@ -219,12 +220,7 @@ func (m *DefragManager) Run() error {
 	log.Info("Fragment builders initialized: %s", m.deviceName)
 	var f *layers.MStreamFragment
 	for {
-		select {
-		case f = <-m.FragmentedCh:
-		case <-time.After(10 * time.Millisecond):
-			log.Info("Timeout in fragment manager: %s", m.deviceName)
-			f = <-m.FragmentedCh
-		}
+		f = <-m.FragmentedCh
 		log.Debug("Send fragment part: %s %d offset: %d length: %d last: %t",
 			m.deviceName, f.FragmentID, f.FragmentOffset, f.FragmentLength, f.LastFragment())
 		m.fragmentBuilders[f.FragmentID].FragmentedCh <- f

@@ -14,7 +14,7 @@ RUN make build
 
 FROM ${RELEASE_IMAGE} as release
 
-RUN apt-get update && apt-get install -y iproute2 telnet net-tools bash-completion vim
+RUN apt-get update && apt-get install -y iproute2 telnet net-tools bash-completion vim tcpdump
 
 LABEL org.opencontainers.image.authors='greenlab@jinr.ru' \
       org.opencontainers.image.url='https://dlnp.jinr.ru' \
