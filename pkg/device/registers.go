@@ -17,19 +17,23 @@ package device
 type RegAlias int
 
 const (
-	RegDeviceCtrl RegAlias = iota
-	Reg32TrigEventNumLoad
+	RegDeviceCtrl         RegAlias = iota
+	Reg32TrigEventNumLoad          // 32-bit register together with next
+	Reg32TrigEventNumLoadUp
 	RegTrigCsr
 	Reg32TdcGenCtrl
+	RegLiveMagic
 	RegAliasLimit
 )
 
 // even more register addresses in mregdevice.h qtmregdevice.cpp
 var RegMap = map[RegAlias]uint16{
-	RegDeviceCtrl:         0x40,
-	Reg32TrigEventNumLoad: 0x104,
-	RegTrigCsr:            0x100,
-	Reg32TdcGenCtrl:       0x220,
+	RegDeviceCtrl:           0x40,
+	RegLiveMagic:            0x48,
+	Reg32TrigEventNumLoad:   0x104, // this is 32-bit register together with next
+	Reg32TrigEventNumLoadUp: 0x105,
+	RegTrigCsr:              0x100,
+	Reg32TdcGenCtrl:         0x220,
 }
 
 const (

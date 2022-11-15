@@ -43,6 +43,8 @@ func NewMStreamCommand() *cobra.Command {
 					return err
 				}
 				return apiClient.MStreamStartAll()
+			case "start2":
+				return apiClient.MStreamStartAll()
 			case "stop":
 				err := apiClient.MStreamStopAll()
 				if err != nil {

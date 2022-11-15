@@ -24,6 +24,9 @@ type Device interface {
 	MStreamStart() error
 	MStreamStop() error
 
+	ResetEvNumAndStats() error
+	WriteLiveMagic() error
+
 	//SetTriggerTimer(val bool) error
 	//SetTriggerThreshold(val bool) error
 	//SetTriggerLemo(val bool) error

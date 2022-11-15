@@ -15,6 +15,8 @@
 package device
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"net"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
@@ -122,6 +124,7 @@ type Device struct {
 	dspParams                      *DspParams
 	ctrl                           ifc.ControlServer
 	state                          ifc.State
+	LiveMagic                      uint16
 }
 
 var _ deviceifc.Device = &Device{}
@@ -139,6 +142,7 @@ func NewDevice(device *config.Device, ctrl ifc.ControlServer, state ifc.State) (
 		SoftwareZeroSuppression:        false,
 		ctrl:                           ctrl,
 		state:                          state,
+		LiveMagic:                      NewMagic(),
 	}
 	for i := 0; i < Nch; i++ {
 		d.ChSettings[i] = &ChannelSettings{
@@ -407,19 +411,56 @@ func (d *Device) ResetEvNumAndStats() error {
 	var ops []*layers.RegOp
 	ops = []*layers.RegOp{
 		{Reg: &layers.Reg{Addr: RegMap[Reg32TrigEventNumLoad], Value: uint16(1)}},
+		{Reg: &layers.Reg{Addr: RegMap[Reg32TrigEventNumLoadUp], Value: uint16(0)}},
 		{Reg: &layers.Reg{Addr: RegMap[RegTrigCsr], Value: uint16(1)}},
 		{Reg: &layers.Reg{Addr: RegMap[RegTrigCsr], Value: uint16(0)}},
 	}
 	return d.ctrl.RegRequest(ops, d.IP)
 }
 
+func NewMagic() uint16 {
+	buf := make([]byte, 4)
+	rand.Read(buf)
+	return uint16(binary.LittleEndian.Uint32(buf)%30000 + 100)
+}
+
+// WriteLiveMagic ...
+func (d *Device) WriteLiveMagic() error {
+	var ops []*layers.RegOp
+	d.LiveMagic += 1
+	if d.LiveMagic == 0 {
+		d.LiveMagic = NewMagic()
+	}
+	ops = []*layers.RegOp{
+		{Reg: &layers.Reg{Addr: RegMap[RegLiveMagic], Value: d.LiveMagic}},
+	}
+	return d.ctrl.RegRequest(ops, d.IP)
+}
+
 // MStreamStart ...
-func (d *Device) MStreamStart() error {
+func (d *Device) MStreamStart2() error {
 	var ops []*layers.RegOp
 	ops = []*layers.RegOp{
 		{Reg: &layers.Reg{Addr: RegMap[RegDeviceCtrl], Value: 0x8000}},
 	}
 	return d.ctrl.RegRequest(ops, d.IP)
+}
+
+// MStreamStart ...
+func (d *Device) MStreamStart() error {
+	//if err := d.ResetEvNumAndStats(); err != nil {
+	//	return err
+	//}
+	if err := d.MStreamStart2(); err != nil {
+		return err
+	}
+	//if err := d.WriteLiveMagic(); err != nil {
+	//	return err
+	//}
+	//if err := d.WriteLiveMagic(); err != nil {
+	//	return err
+	//}
+	return nil
 }
 
 // MStreamStop ...
