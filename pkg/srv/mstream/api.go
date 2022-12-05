@@ -141,7 +141,7 @@ func (s *ApiServer) configureRouter() {
 	//     "$ref": "#/responses/okResp"
 	//   "400":
 	//     "$ref": "#/responses/badReq"
-	subRouter.HandleFunc("/connect_to_devices", s.handleConnectToDevices()).Methods("GET")
+	//subRouter.HandleFunc("/connect_to_devices", s.handleConnectToDevices()).Methods("GET")
 	s.Router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", http.FileServer(http.Dir("./swaggerui/"))))
 }
 
@@ -166,12 +166,12 @@ func (s *ApiServer) handleFlush() http.HandlerFunc {
 	}
 }
 
-func (s *ApiServer) handleConnectToDevices() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		log.Debug("Handling connect to devices request")
-		err := s.mstream.ConnectToDevices()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
-		}
-	}
-}
+//func (s *ApiServer) handleConnectToDevices() http.HandlerFunc {
+//	return func(w http.ResponseWriter, r *http.Request) {
+//		log.Debug("Handling connect to devices request")
+//		err := s.mstream.ConnectToDevices()
+//		if err != nil {
+//			http.Error(w, err.Error(), http.StatusBadGateway)
+//		}
+//	}
+//}

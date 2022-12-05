@@ -37,8 +37,8 @@ const (
 	WriterChSize       = 100
 	FragmentedChSize   = 100
 	DefragmentedChSize = 100
-	InChSize           = 100
-	OutChSize          = 100
+	InChSize           = 1
+	OutChSize          = 10
 )
 
 const (
@@ -119,31 +119,6 @@ func (s *MStreamServer) Run() error {
 		}
 		defragManager := NewDefragManager(deviceName, s.fragmentedChs[deviceName], s.defragmentedChs[deviceName])
 		eventBuilder := NewEventBuilder(deviceName, s.defragmentedChs[deviceName], s.writerChs[deviceName])
-		packetDataSource := NewPacketSource()
-
-		// Read packets from wire and put them to input queue
-		go func(deviceName string, conn *net.UDPConn, udpAddr *net.UDPAddr, packetDataSource *PacketSource) {
-			buffer := make([]byte, InputBufferSize)
-			for {
-				length, _, readErr := conn.ReadFrom(buffer)
-				if readErr != nil {
-					errChan <- readErr
-					return
-				}
-
-				captureInfo := gopacket.CaptureInfo{
-					Length:        length,
-					CaptureLength: length,
-					Timestamp:     time.Now(),
-					AncillaryData: []interface{}{udpAddr, deviceName},
-				}
-				packet := srv.InPacket{CaptureInfo: captureInfo, Data: make([]byte, length)}
-				copy(packet.Data, buffer[:length])
-
-				packetDataSource.ChIn <- packet
-
-			}
-		}(deviceName, conn, udpAddr, packetDataSource)
 
 		// Read packets from output queue and send them to wire
 		go func(conn *net.UDPConn, chOut <-chan srv.OutPacket) {
@@ -205,14 +180,37 @@ func (s *MStreamServer) Run() error {
 			defragManager.Run()
 		}(defragManager)
 
-		// Run parsers
-		go func(deviceName string, packetDataSource *PacketSource, fragmentedCh chan<- *layers.MStreamFragment, outCh chan<- srv.OutPacket) {
-			source := gopacket.NewPacketSource(packetDataSource, layers.MLinkLayerType)
-			source.Lazy = true
-			packetsCh := source.Packets()
-			var packet gopacket.Packet
+		counterCh := make(chan int)
+		//
+		go func(counterCh <-chan int) {
+			//counter := 0
 			for {
-				packet = <-packetsCh
+				<-counterCh
+				//counter += 1
+				//log.Info("Packet counter: %d", counter)
+			}
+		}(counterCh)
+
+		// Run parsers
+		go func(deviceName string, conn *net.UDPConn, udpAddr *net.UDPAddr, fragmentedCh chan<- *layers.MStreamFragment, outCh chan<- srv.OutPacket, counterCh chan<- int) {
+			buffer := make([]byte, InputBufferSize)
+			decodeOptions := gopacket.DecodeOptions{
+				Lazy:   false,
+				NoCopy: true,
+			}
+			for {
+				length, _, readErr := conn.ReadFromUDP(buffer)
+				if readErr != nil {
+					errChan <- readErr
+					return
+				}
+				counterCh <- 1
+
+				data := make([]byte, length)
+				copy(data, buffer[:length])
+
+				packet := gopacket.NewPacket(data, layers.MLinkLayerType, decodeOptions)
+
 				var mlSeq uint16
 				var mlSrc uint16
 				var mlDst uint16
@@ -228,33 +226,33 @@ func (s *MStreamServer) Run() error {
 					log.Debug("MStream frame successfully parsed")
 					ms := mstreamLayer.(*layers.MStreamLayer)
 
-					udpaddr, getAddrErr := srv.GetAddrPort(packet)
-					if getAddrErr != nil {
-						log.Error("Error while getting udpaddr for a packet from input queue")
-						continue
-					}
-
 					for _, f := range ms.Fragments {
 						log.Debug("Handling fragment: FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t",
 							f.FragmentID, f.FragmentOffset, f.LastFragment())
 
 						fragmentedCh <- f
 
-						ackErr := s.SendAck(mlDst, mlSrc, mlSeq, f.FragmentID, f.FragmentOffset, udpaddr, outCh)
+						ackErr := SendAck(mlDst, mlSrc, mlSeq, f.FragmentID, f.FragmentOffset, udpAddr, conn)
 						if ackErr != nil {
-							log.Error("Error while sending Ack for fragment: ID: %d Offset: %d Length: %d",
-								f.FragmentID, f.FragmentOffset, f.FragmentLength)
+							log.Error("Error while sending Ack: udpAddr: %s fragment: ID: %d Offset: %d Length: %d",
+								udpAddr, f.FragmentID, f.FragmentOffset, f.FragmentLength)
 						}
 					}
 				}
 			}
-		}(deviceName, packetDataSource, s.fragmentedChs[deviceName], s.outChs[deviceName])
+		}(deviceName, conn, udpAddr, s.fragmentedChs[deviceName], s.outChs[deviceName], counterCh)
+
+		errAck := SendAck(layers.MLinkDeviceAddr, 1, 0, 0xffff, 0xffff, udpAddr, conn)
+		if errAck != nil {
+			log.Error("Error while connecting to MStream device: udpAddr: %s", udpAddr)
+			return errAck
+		}
 	}
 
-	errConnect := s.ConnectToDevices()
-	if errConnect != nil {
-		return errConnect
-	}
+	//errConnect := s.ConnectToDevices()
+	//if errConnect != nil {
+	//	return errConnect
+	//}
 
 	go func() {
 		s.api.Run()
@@ -268,7 +266,7 @@ func (s *MStreamServer) Run() error {
 	}
 }
 
-func (s *MStreamServer) SendAck(mlSrc, mlDst, mlSeq, fragmentID, fragmentOffset uint16, udpAddr *net.UDPAddr, outCh chan<- srv.OutPacket) error {
+func SendAck(mlSrc, mlDst, mlSeq, fragmentID, fragmentOffset uint16, udpAddr *net.UDPAddr, conn *net.UDPConn) error {
 	ml := &layers.MLinkLayer{}
 	ml.Type = layers.MLinkTypeMStream
 	ml.Sync = layers.MLinkSync
@@ -298,37 +296,36 @@ func (s *MStreamServer) SendAck(mlSrc, mlDst, mlSeq, fragmentID, fragmentOffset 
 	opts := gopacket.SerializeOptions{}
 	err := gopacket.SerializeLayers(buf, opts, ml, ms)
 	if err != nil {
-		log.Error("Error while serializing layers when sending MStream ack message to device %s", udpAddr)
+		log.Error("Error while serializing layers when sending MStream ack: udpAddr: %s", udpAddr)
 		return err
 	}
 
-	log.Debug("Put MStream Ack to output queue: udpaddr: %s ack: %s", udpAddr, hex.EncodeToString(buf.Bytes()))
-	//log.Debug("Put MStream Ack to output queue: udpaddr: %s fragment: %d", udpAddr, fragmentID)
-	outCh <- srv.OutPacket{
-		Data:    buf.Bytes(),
-		UDPAddr: udpAddr,
+	log.Debug("Send MStream Ack: udpAddr: %s ack: %s", udpAddr, hex.EncodeToString(buf.Bytes()))
+	_, sendErr := conn.WriteToUDP(buf.Bytes(), udpAddr)
+	if sendErr != nil {
+		return sendErr
 	}
 	return nil
 }
 
-func (s *MStreamServer) ConnectToDevices() error {
-	log.Info("~~~~~~~~~~~~~~~~~~~~ ConnectToDevices")
-	// to connect to peer devices it is enough to send them an MStream ack
-	// message with empty payload and with fragmentID = -1 and fragmentOffset = -1
-	for _, device := range s.Config.Devices {
-		log.Info("~~~~~~~~~ ConnectToDevices: %s", device.IP)
-		udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", device.IP, DeviceMStreamPort))
-		if err != nil {
-			return err
-		}
-		err = s.SendAck(layers.MLinkDeviceAddr, 1, 0, 0xffff, 0xffff, udpAddr, s.outChs[device.Name])
-		if err != nil {
-			log.Error("Error while connecting to MStream device %s:%s", device.IP, DeviceMStreamPort)
-			return err
-		}
-	}
-	return nil
-}
+//func (s *MStreamServer) ConnectToDevices() error {
+//	log.Info("~~~~~~~~~~~~~~~~~~~~ ConnectToDevices")
+//	// to connect to peer devices it is enough to send them an MStream ack
+//	// message with empty payload and with fragmentID = -1 and fragmentOffset = -1
+//	for _, device := range s.Config.Devices {
+//		log.Info("~~~~~~~~~ ConnectToDevices: %s", device.IP)
+//		udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", device.IP, DeviceMStreamPort))
+//		if err != nil {
+//			return err
+//		}
+//		err = s.SendAck(layers.MLinkDeviceAddr, 1, 0, 0xffff, 0xffff, udpAddr, s.outChs[device.Name])
+//		if err != nil {
+//			log.Error("Error while connecting to MStream device %s:%s", device.IP, DeviceMStreamPort)
+//			return err
+//		}
+//	}
+//	return nil
+//}
 
 func PersistFilename(dir, prefix, name, suffix string) string {
 	filename := fmt.Sprintf("%s_%s.data", name, suffix)
