@@ -25,9 +25,38 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
+type TrigSetup struct {
+	Timer     bool `json:"Timer"`
+	Threshold bool `json:"Threshold"`
+	Lemo      bool `json:"Lemo"`
+}
+
+type MAFSetup struct {
+	Selector int
+	BLC      int
+}
+
+type InvertSetup struct {
+	Invert bool
+}
+
+type ReadoutWindowSetup struct {
+	Size    uint16
+	Latency uint16
+}
+
+type ZsSetup struct {
+	Zs bool
+}
+
 type Device struct {
-	Name string  `json:"name,omitempty"`
-	IP   *net.IP `json:"ip,omitempty"`
+	Name                string  `json:"name,omitempty"`
+	IP                  *net.IP `json:"ip,omitempty"`
+	*TrigSetup          `json:"TriggerSetup,omitempty"`
+	*MAFSetup           `json:"MafSetup,omitempty"`
+	*InvertSetup        `json:"InvertSetup,omitempty"`
+	*ReadoutWindowSetup `json:"ReadoutWindowSetup,omitempty"`
+	*ZsSetup            `json:"ZsSetup,omitempty"`
 }
 
 type Config struct {

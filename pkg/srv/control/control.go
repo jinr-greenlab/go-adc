@@ -81,8 +81,15 @@ func NewControlServer(ctx context.Context, cfg *config.Config) (ifc.ControlServe
 		if newdevErr != nil {
 			return nil, err
 		}
+
+		setErr := device.SetDeviceSettingsFromConfig(cfgDevice)
+		if setErr != nil {
+			return nil, setErr
+		}
+
 		devices[cfgDevice.Name] = device
 	}
+
 	s.devices = devices
 
 	apiServer, err := NewApiServer(ctx, cfg, s)

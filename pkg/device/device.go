@@ -494,3 +494,57 @@ func (d *Device) WriteChCtrl(ch int) error {
 	d.WriteChReg(ch, MemMap[MemChBlcThrLo], uint32(-d.dspParams.BlcThr))
 	return nil
 }
+
+func (d *Device) SetDeviceSettingsFromConfig(cfg *config.Device) error {
+	if cfg.TrigSetup != nil {
+		err := d.SetTriggerTimer(cfg.TrigSetup.Timer)
+		if err != nil {
+			return err
+		}
+		err = d.SetTriggerThreshold(cfg.TrigSetup.Threshold)
+		if err != nil {
+			return err
+		}
+		err = d.SetTriggerLemo(cfg.TrigSetup.Lemo)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cfg.MAFSetup != nil {
+		err := d.SetMafSelector(cfg.MAFSetup.Selector)
+		if err != nil {
+			return err
+		}
+		err = d.SetMafBlcThresh(cfg.MAFSetup.BLC)
+		if err != nil {
+			return err
+		}
+	}
+	if cfg.InvertSetup != nil {
+		err := d.SetInvert(cfg.InvertSetup.Invert)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cfg.ReadoutWindowSetup != nil {
+		err := d.SetWindowSize(cfg.ReadoutWindowSetup.Size)
+		if err != nil {
+			return err
+		}
+		err = d.SetLatency(cfg.ReadoutWindowSetup.Latency)
+		if err != nil {
+			return err
+		}
+	}
+
+	if cfg.ZsSetup != nil {
+		err := d.SetZs(cfg.ZsSetup.Zs)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
