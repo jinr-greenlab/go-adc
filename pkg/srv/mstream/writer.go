@@ -16,6 +16,7 @@ package mstream
 
 import (
 	"os"
+	"path/filepath"
 
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
@@ -25,6 +26,14 @@ type Writer struct {
 }
 
 func NewWriter(filename string) (*Writer, error) {
+	dir, _ := filepath.Split(filename)
+
+	err := os.MkdirAll(dir, 0755)
+	if err != nil && !os.IsExist(err) {
+		log.Error("Error while creating directory: %s", dir)
+		return nil, err
+	}
+
 	file, err := os.Create(filename)
 	if err != nil {
 		log.Error("Error while creating file: %s", filename)
