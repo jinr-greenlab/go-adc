@@ -14,29 +14,29 @@
 
 // go-adc64 API
 //
-// RESTful APIs to interact with go-adc64 server
+// # RESTful APIs to interact with go-adc64 server
 //
 // Terms Of Service:
 //
-//     Schemes: http
-//     Host: localhost:8003
-//     Version: 1.0.0
-//     Contact:
+// Schemes: http
+// Host: localhost:8003
+// Version: 1.0.0
+// Contact:
 //
-//     Consumes:
-//     - application/json
+//	Consumes:
+//	- application/json
 //
-//     Produces:
-//     - application/json
+//	Produces:
+//	- application/json
 //
-//     Security:
-//     - api_key:
+//	Security:
+//	- api_key:
 //
-//     SecurityDefinitions:
-//     api_key:
-//          type: apiKey
-//          name: KEY
-//          in: header
+//	SecurityDefinitions:
+//	api_key:
+//	     type: apiKey
+//	     name: KEY
+//	     in: header
 //
 // swagger:meta
 package control
@@ -51,11 +51,11 @@ import (
 	"github.com/gorilla/mux"
 
 	"jinr.ru/greenlab/go-adc/pkg/config"
+	devicepkg "jinr.ru/greenlab/go-adc/pkg/device"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 	"jinr.ru/greenlab/go-adc/pkg/srv"
 	"jinr.ru/greenlab/go-adc/pkg/srv/control/ifc"
-	//"jinr.ru/greenlab/go-adc/pkg/device"
 )
 
 const (
@@ -391,15 +391,15 @@ func (s *ApiServer) handleTrigger() http.HandlerFunc {
 
 		if setup.Timer != "" {
 			val, _ := strconv.ParseBool(setup.Timer)
-			err = device.SetTriggerTimer(val)
+			err = device.SetTrigger(devicepkg.RegTrigStatusBitTimer, val)
 		}
 		if setup.Threshold != "" {
 			val, _ := strconv.ParseBool(setup.Threshold)
-			err = device.SetTriggerThreshold(val)
+			err = device.SetTrigger(devicepkg.RegTrigStatusBitThreshold, val)
 		}
 		if setup.Lemo != "" {
 			val, _ := strconv.ParseBool(setup.Lemo)
-			err = device.SetTriggerLemo(val)
+			err = device.SetTrigger(devicepkg.RegTrigStatusBitLemo, val)
 		}
 
 		if err != nil {

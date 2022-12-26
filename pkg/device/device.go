@@ -248,7 +248,7 @@ func (d *Device) TruncateValue(val int) int {
 	return val
 }
 
-func (d *Device) SetTriggerTimer(val bool) error {
+func (d *Device) SetTrigger(bitmask uint16, val bool) error {
 	state, err := d.RegRead(RegMap[RegTrigCtrl])
 	reg := state.Value
 	if err != nil {
@@ -256,47 +256,9 @@ func (d *Device) SetTriggerTimer(val bool) error {
 	}
 
 	if val {
-		reg |= RegTrigStatusBitTimer
+		reg |= bitmask
 	} else {
-		reg &= ^RegTrigStatusBitTimer
-	}
-
-	ops := []*layers.RegOp{
-		{Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: reg}},
-	}
-	return d.ctrl.RegRequest(ops, d.IP)
-}
-
-func (d *Device) SetTriggerThreshold(val bool) error {
-	state, err := d.RegRead(RegMap[RegTrigCtrl])
-	reg := state.Value
-	if err != nil {
-		return err
-	}
-
-	if val {
-		reg |= RegTrigStatusBitThreshold
-	} else {
-		reg &= ^RegTrigStatusBitThreshold
-	}
-
-	ops := []*layers.RegOp{
-		{Reg: &layers.Reg{Addr: RegMap[RegTrigCtrl], Value: reg}},
-	}
-	return d.ctrl.RegRequest(ops, d.IP)
-}
-
-func (d *Device) SetTriggerLemo(val bool) error {
-	state, err := d.RegRead(RegMap[RegTrigCtrl])
-	reg := state.Value
-	if err != nil {
-		return err
-	}
-
-	if val {
-		reg |= RegTrigStatusBitLemo
-	} else {
-		reg &= ^RegTrigStatusBitLemo
+		reg &= ^bitmask
 	}
 
 	ops := []*layers.RegOp{
@@ -497,15 +459,15 @@ func (d *Device) WriteChCtrl(ch int) error {
 
 func (d *Device) SetDeviceSettingsFromConfig(cfg *config.Device) error {
 	if cfg.TrigSetup != nil {
-		err := d.SetTriggerTimer(cfg.TrigSetup.Timer)
+		err := d.SetTrigger(RegTrigStatusBitTimer, cfg.TrigSetup.Timer)
 		if err != nil {
 			return err
 		}
-		err = d.SetTriggerThreshold(cfg.TrigSetup.Threshold)
+		err = d.SetTrigger(RegTrigStatusBitThreshold, cfg.TrigSetup.Threshold)
 		if err != nil {
 			return err
 		}
-		err = d.SetTriggerLemo(cfg.TrigSetup.Lemo)
+		err = d.SetTrigger(RegTrigStatusBitLemo, cfg.TrigSetup.Lemo)
 		if err != nil {
 			return err
 		}
