@@ -172,7 +172,10 @@ func (b *FragmentBuilder) SetFragment(f *MStreamFragment) {
 		b.Completed = true
 	}
 
-	if b.Completed && (b.mgr.GetLastClosedFragment()+1) == b.FragmentID {
+	// We used to check if the FragmentID ==  GetLastClosedFragment() + 1
+	// But some fragments can be lost and this breaks the whole run at some point.
+	// So we deliberately got rid of this check.
+	if b.Completed {
 		b.CloseFragment()
 	}
 }
@@ -219,7 +222,7 @@ func (m *FragmentBuilderManager) SetLastClosedFragment(fragmentID uint16) {
 }
 
 func (m *FragmentBuilderManager) SetFragment(f *MStreamFragment) {
-	log.Info("Setting fragment part: %s %d offset: %d length: %d last: %t",
+	log.Debug("Setting fragment part: %s %d offset: %d length: %d last: %t",
 		m.deviceName, f.FragmentID, f.FragmentOffset, f.FragmentLength, f.LastFragment())
 
 	m.fragmentBuilders[f.FragmentID].SetFragment(f)
