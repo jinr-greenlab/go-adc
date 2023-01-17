@@ -343,7 +343,7 @@ func (s *MStreamServer) Flush() {
 }
 
 func (s *MStreamServer) Persist(dir, filePrefix string) {
-	timestamp := time.Now().Format("20060102_150405")
+	timestamp := time.Now().In(time.Local).Format("20060102_150405")
 	for _, device := range s.Config.Devices {
 		log.Info("Persist writer: %s", device.Name)
 		filename := PersistFilename(dir, filePrefix, device.Name, timestamp)
