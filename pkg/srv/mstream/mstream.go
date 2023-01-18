@@ -138,7 +138,7 @@ func (s *MStreamServer) Run() error {
 	go func() {
 		for {
 			outPacket := <-s.ChOut
-			log.Info("Sending packet to %s data: \n%s", outPacket.UDPAddr, hex.EncodeToString(outPacket.Data))
+			log.Debug("Sending packet to %s data: \n%s", outPacket.UDPAddr, hex.EncodeToString(outPacket.Data))
 			_, sendErr := conn.WriteToUDP(outPacket.Data, outPacket.UDPAddr)
 			if sendErr != nil {
 				log.Error("Error while sending data to %s", outPacket.UDPAddr)
@@ -223,7 +223,7 @@ func (s *MStreamServer) Run() error {
 					}
 
 					for _, f := range ms.Fragments {
-						log.Info("Handling fragment: FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t",
+						log.Debug("Handling fragment: FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t",
 							f.FragmentID, f.FragmentOffset, f.LastFragment())
 
 						ackErr := s.SendAck(0, mlSeq, f.FragmentID, f.FragmentOffset, udpaddr)
@@ -296,7 +296,7 @@ func (s *MStreamServer) SendAck(src, seq, fragmentID, fragmentOffset uint16, udp
 	}
 
 	log.Debug("Put MStream Ack to output queue: udpaddr: %s ack: %s", udpAddr, hex.EncodeToString(buf.Bytes()))
-	log.Info("Put MStream ack to output queue: udpaddr: %s fragment: %d", udpAddr, fragmentID)
+	log.Debug("Put MStream ack to output queue: udpaddr: %s fragment: %d", udpAddr, fragmentID)
 	s.ChOut <- srv.OutPacket{
 		Data:    buf.Bytes(),
 		UDPAddr: udpAddr,
