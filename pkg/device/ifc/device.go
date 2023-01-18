@@ -24,9 +24,7 @@ type Device interface {
 	MStreamStart() error
 	MStreamStop() error
 
-	SetTriggerTimer(val bool) error
-	SetTriggerThreshold(val bool) error
-	SetTriggerLemo(val bool) error
+	SetTrigger(bitmask uint16, val bool) error
 
 	SetMafSelector(val int) error
 	SetMafBlcThresh(val int) error
