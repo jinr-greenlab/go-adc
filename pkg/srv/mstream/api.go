@@ -14,29 +14,29 @@
 
 // go-adc64 API
 //
-// RESTful APIs to interact with go-adc64 server
+// # RESTful APIs to interact with go-adc64 server
 //
 // Terms Of Service:
 //
-//     Schemes: http
-//     Host: localhost:8003
-//     Version: 1.0.0
-//     Contact:
+//	Schemes: http
+//	Host: localhost:8003
+//	Version: 1.0.0
+//	Contact:
 //
-//     Consumes:
-//     - application/json
+//	Consumes:
+//	- application/json
 //
-//     Produces:
-//     - application/json
+//	Produces:
+//	- application/json
 //
-//     Security:
-//     - api_key:
+//	Security:
+//	- api_key:
 //
-//     SecurityDefinitions:
-//     api_key:
-//          type: apiKey
-//          name: KEY
-//          in: header
+//	SecurityDefinitions:
+//	api_key:
+//	     type: apiKey
+//	     name: KEY
+//	     in: header
 //
 // swagger:meta
 package mstream
@@ -132,6 +132,16 @@ func (s *ApiServer) configureRouter() {
 	//   "400":
 	//     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/flush", s.handleFlush()).Methods("GET")
+	// swagger:operation GET /headway mstream getHeadway
+	// ---
+	// summary: headway mstream
+	// description: --
+	// responses:
+	//   "200":
+	//     "$ref": "#/responses/okResp"
+	//   "400":
+	//     "$ref": "#/responses/badReq"
+	subRouter.HandleFunc("/headway", s.handleHeadway()).Methods("GET")
 	// swagger:operation GET /connect_to_devices mstream getConnect
 	// ---
 	// summary: connects mstream to adc boards
@@ -163,6 +173,14 @@ func (s *ApiServer) handleFlush() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Debug("Handling flush request")
 		s.mstream.Flush()
+	}
+}
+
+func (s *ApiServer) handleHeadway() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log.Debug("Handling headway request")
+		s.mstream.api_headway_reqCh <- true
+		w.Write(<-s.mstream.api_headway_jsonCh)
 	}
 }
 
