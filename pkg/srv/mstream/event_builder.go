@@ -21,17 +21,19 @@ import (
 )
 
 type EventBuilder struct {
-	deviceName     string
-	defragmentedCh <-chan *layers.MStreamFragment
-	writerCh       chan<- []byte
+	deviceName         string
+	defragmentedCh     <-chan *layers.MStreamFragment
+	writerCh           chan<- []byte
+	api_headway_byteCh chan<- []byte
 }
 
 // NewEventBuilder ...
-func NewEventBuilder(deviceName string, defragmentedCh <-chan *layers.MStreamFragment, writerCh chan<- []byte) *EventBuilder {
+func NewEventBuilder(deviceName string, defragmentedCh <-chan *layers.MStreamFragment, writerCh chan<- []byte, api_headway_byteCh chan<- []byte) *EventBuilder {
 	return &EventBuilder{
-		deviceName:     deviceName,
-		defragmentedCh: defragmentedCh,
-		writerCh:       writerCh,
+		deviceName:         deviceName,
+		defragmentedCh:     defragmentedCh,
+		writerCh:           writerCh,
+		api_headway_byteCh: api_headway_byteCh,
 	}
 }
 
@@ -69,6 +71,7 @@ func (b *EventBuilder) HandleFragment(f *layers.MStreamFragment) {
 		return
 	}
 
+	b.api_headway_byteCh <- buf.Bytes()
 	b.writerCh <- buf.Bytes()
 }
 
