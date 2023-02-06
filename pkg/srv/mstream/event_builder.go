@@ -16,6 +16,7 @@ package mstream
 
 import (
 	"github.com/google/gopacket"
+
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
@@ -24,14 +25,16 @@ type EventBuilder struct {
 	deviceName     string
 	defragmentedCh <-chan *layers.MStreamFragment
 	writerCh       chan<- []byte
+	lastEventCh    chan []byte
 }
 
 // NewEventBuilder ...
-func NewEventBuilder(deviceName string, defragmentedCh <-chan *layers.MStreamFragment, writerCh chan<- []byte) *EventBuilder {
+func NewEventBuilder(deviceName string, defragmentedCh <-chan *layers.MStreamFragment, writerCh chan<- []byte, lastEventCh chan []byte) *EventBuilder {
 	return &EventBuilder{
 		deviceName:     deviceName,
 		defragmentedCh: defragmentedCh,
 		writerCh:       writerCh,
+		lastEventCh:    lastEventCh,
 	}
 }
 
@@ -67,6 +70,13 @@ func (b *EventBuilder) HandleFragment(f *layers.MStreamFragment) {
 		log.Error("Error while serializing Mpd layer: device: %08x, event: %s",
 			f.MStreamPayloadHeader.DeviceSerial, f.MStreamPayloadHeader.EventNum)
 		return
+	}
+
+	select {
+	case <-b.lastEventCh:
+		b.lastEventCh <- f.Data
+	default:
+		b.lastEventCh <- f.Data
 	}
 
 	b.writerCh <- buf.Bytes()

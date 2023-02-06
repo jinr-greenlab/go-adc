@@ -21,6 +21,7 @@ import (
 	"io"
 	"net"
 	"path"
+	"sync"
 	"time"
 
 	"github.com/google/gopacket"
@@ -54,6 +55,9 @@ type MStreamServer struct {
 	fragmentedChs     map[string]chan *layers.MStreamFragment
 	defragmentedChs   map[string]chan *layers.MStreamFragment
 	outChs            map[string]chan srv.OutPacket
+	lastEventChs      map[string]chan []byte
+	lastEvent         map[string][]byte
+	mu                sync.RWMutex
 }
 
 func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, error) {
@@ -70,6 +74,9 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 		fragmentedChs:     make(map[string]chan *layers.MStreamFragment),
 		defragmentedChs:   make(map[string]chan *layers.MStreamFragment),
 		outChs:            make(map[string]chan srv.OutPacket),
+		lastEventChs:      make(map[string]chan []byte),
+		lastEvent:         make(map[string][]byte),
+		mu:                sync.RWMutex{},
 	}
 
 	for _, device := range cfg.Devices {
@@ -79,6 +86,7 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 		s.fragmentedChs[device.Name] = make(chan *layers.MStreamFragment, FragmentedChSize)
 		s.defragmentedChs[device.Name] = make(chan *layers.MStreamFragment, DefragmentedChSize)
 		s.outChs[device.Name] = make(chan srv.OutPacket, OutChSize)
+		s.lastEventChs[device.Name] = make(chan []byte, 1)
 	}
 
 	apiServer, err := NewApiServer(ctx, cfg, s)
@@ -118,7 +126,7 @@ func (s *MStreamServer) Run() error {
 			return errResolve
 		}
 		defragManager := NewDefragManager(deviceName, s.fragmentedChs[deviceName], s.defragmentedChs[deviceName])
-		eventBuilder := NewEventBuilder(deviceName, s.defragmentedChs[deviceName], s.writerChs[deviceName])
+		eventBuilder := NewEventBuilder(deviceName, s.defragmentedChs[deviceName], s.writerChs[deviceName], s.lastEventChs[deviceName])
 
 		// Read packets from output queue and send them to wire
 		go func(conn *net.UDPConn, chOut <-chan srv.OutPacket) {
