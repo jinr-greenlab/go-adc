@@ -47,13 +47,16 @@ const (
 
 type MStreamServer struct {
 	srv.Server
-	api               *ApiServer
-	packetDataSources map[string]*PacketSource
-	writerChs         map[string]chan []byte
-	writerStateChs    map[string]chan string
-	fragmentedChs     map[string]chan *layers.MStreamFragment
-	defragmentedChs   map[string]chan *layers.MStreamFragment
-	outChs            map[string]chan srv.OutPacket
+	api                *ApiServer
+	packetDataSources  map[string]*PacketSource
+	writerChs          map[string]chan []byte
+	writerStateChs     map[string]chan string
+	fragmentedChs      map[string]chan *layers.MStreamFragment
+	defragmentedChs    map[string]chan *layers.MStreamFragment
+	outChs             map[string]chan srv.OutPacket
+	api_headway_byteCh chan []byte
+	api_headway_jsonCh chan []byte
+	api_headway_reqCh  chan bool
 }
 
 func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, error) {
@@ -64,12 +67,15 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 			Context: ctx,
 			Config:  cfg,
 		},
-		packetDataSources: make(map[string]*PacketSource),
-		writerChs:         make(map[string]chan []byte),
-		writerStateChs:    make(map[string]chan string),
-		fragmentedChs:     make(map[string]chan *layers.MStreamFragment),
-		defragmentedChs:   make(map[string]chan *layers.MStreamFragment),
-		outChs:            make(map[string]chan srv.OutPacket),
+		packetDataSources:  make(map[string]*PacketSource),
+		writerChs:          make(map[string]chan []byte),
+		writerStateChs:     make(map[string]chan string),
+		fragmentedChs:      make(map[string]chan *layers.MStreamFragment),
+		defragmentedChs:    make(map[string]chan *layers.MStreamFragment),
+		outChs:             make(map[string]chan srv.OutPacket),
+		api_headway_byteCh: make(chan []byte),
+		api_headway_jsonCh: make(chan []byte),
+		api_headway_reqCh:  make(chan bool),
 	}
 
 	for _, device := range cfg.Devices {
@@ -118,7 +124,7 @@ func (s *MStreamServer) Run() error {
 			return errResolve
 		}
 		defragManager := NewDefragManager(deviceName, s.fragmentedChs[deviceName], s.defragmentedChs[deviceName])
-		eventBuilder := NewEventBuilder(deviceName, s.defragmentedChs[deviceName], s.writerChs[deviceName])
+		eventBuilder := NewEventBuilder(deviceName, s.defragmentedChs[deviceName], s.writerChs[deviceName], s.api_headway_byteCh)
 
 		// Read packets from output queue and send them to wire
 		go func(conn *net.UDPConn, chOut <-chan srv.OutPacket) {
@@ -169,6 +175,9 @@ func (s *MStreamServer) Run() error {
 				}
 			}
 		}(s.writerStateChs[deviceName], s.writerChs[deviceName])
+
+		//Run parse event from event builders for api
+		go ParseEventsForApi(s.api_headway_byteCh, s.api_headway_jsonCh, s.api_headway_reqCh)
 
 		// Run event builders
 		go func(eventBuilder *EventBuilder) {
