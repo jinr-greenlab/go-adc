@@ -186,8 +186,13 @@ func (s *ApiServer) handleLastEvent() http.HandlerFunc {
 				s.mstream.mu.Unlock()
 			default:
 				s.mstream.mu.RLock()
-				w.Write(MstreamHeaderJson(s.mstream.lastEvent["deviceName"]))
+				le := s.mstream.lastEvent["deviceName"]
 				s.mstream.mu.RUnlock()
+				if len(le) != 0 {
+					w.Write(MstreamHeaderJson(le))
+				} else {
+					http.Error(w, "no content", http.StatusNoContent)
+				}
 			}
 			log.Debug("Handling last event request for device ", mux.Vars(r)["deviceName"])
 		} else {
