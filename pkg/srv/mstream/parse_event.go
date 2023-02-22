@@ -170,11 +170,15 @@ func NewMstreamHeader(d []byte) MstreamHeader {
 }
 
 func MstreamHeaderJson(d []byte) []byte {
-	e := NewMstreamHeader(d)
-	eJson, err := json.Marshal(e)
-	if err != nil {
-		log.Error("Error Marshal data %s", d) //what is better to do?
-		eJson = []byte{}
+	if len(d) != 0 {
+		e := NewMstreamHeader(d)
+		eJson, err := json.Marshal(e)
+		if err != nil {
+			log.Error("Error Marshal data %s", d) //what is better to do?
+			eJson = []byte{}
+		}
+		return eJson
 	}
-	return eJson
+	log.Error("API requsests, but no data in the mstream")
+	return []byte("no data")
 }
