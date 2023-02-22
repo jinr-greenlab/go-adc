@@ -17,6 +17,7 @@ package mstream
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -101,8 +102,9 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 func (s *MStreamServer) Run() error {
 	errChan := make(chan error, 1)
 
-	// flush all files before exit
-	defer s.Flush()
+	if len(s.Config.Devices) == 0 {
+		errChan <- errors.New("No devices in config")
+	}
 
 	// Read packets from input queue and handle them properly
 	for _, device := range s.Config.Devices {
@@ -256,6 +258,9 @@ func (s *MStreamServer) Run() error {
 			return errAck
 		}
 	}
+
+	// flush all files before exit
+	defer s.Flush()
 
 	//errConnect := s.ConnectToDevices()
 	//if errConnect != nil {
