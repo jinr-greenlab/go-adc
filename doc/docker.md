@@ -19,7 +19,7 @@ Let current directory be a directory where you want everything to be put (includ
 ## Initial config file
 First you have to create a default empty config file
 ```
-docker run -it --rm --network host -v ./tmp:/root/.go-adc quay.io/kozhukalov/go-adc:adc64 go-adc config init
+docker run -it --rm --network host -v .:/root/.go-adc quay.io/kozhukalov/go-adc:adc64 go-adc config init
 ```
 
 This command will create a default minimal config file `./config`. The owner of this file will be root since
