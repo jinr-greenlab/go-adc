@@ -132,16 +132,6 @@ func (s *ApiServer) configureRouter() {
 	//   "400":
 	//     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/flush", s.handleFlush()).Methods("GET")
-	// swagger:operation GET /connect_to_devices mstream getConnect
-	// ---
-	// summary: connects mstream to adc boards
-	// description: --
-	// responses:
-	//   "200":
-	//     "$ref": "#/responses/okResp"
-	//   "400":
-	//     "$ref": "#/responses/badReq"
-	subRouter.HandleFunc("/connect_to_devices", s.handleConnectToDevices()).Methods("GET")
 	s.Router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", http.FileServer(http.Dir("./swaggerui/"))))
 }
 
@@ -163,15 +153,5 @@ func (s *ApiServer) handleFlush() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Debug("Handling flush request")
 		s.mstream.Flush()
-	}
-}
-
-func (s *ApiServer) handleConnectToDevices() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		log.Debug("Handling connect to devices request")
-		err := s.mstream.ConnectToDevices()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadGateway)
-		}
 	}
 }
