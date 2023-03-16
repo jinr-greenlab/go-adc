@@ -2,16 +2,18 @@ version: '3.3'
 
 services:
   mstream-server: &mstream-server
-    image: quay.io/kozhukalov/go-adc
-    restart: always
+    environment:
+    - TZ=Europe/Moscow
+    image: quay.io/kozhukalov/go-adc:latest
+    restart: "no"
     volumes:
-    - /home/pmtlab/tmp:/data
-    - /home/pmtlab/.go-adc:/root/.go-adc
+    - .:/data
+    - .:/root/.go-adc
     network_mode: host
-    command: go-adc --log-level debug mstream start
+    command: go-adc mstream start
   control-server:
     <<: *mstream-server
-    command: go-adc --log-level debug control start
+    command: go-adc control start
   discover-server:
     <<: *mstream-server
-    command: go-adc --log-level debug discover start
+    command: go-adc discover start
