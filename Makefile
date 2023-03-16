@@ -9,16 +9,16 @@ swagger:
 
 DOCKER_IMAGE := quay.io/kozhukalov/go-adc
 TIMESTAMP ?= $(shell date +%Y%m%d%H%M%S)
-COMMIT    ?= $(shell git rev-parse HEAD)
+COMMIT    ?= $(shell git log -1 --pretty=%h)
 
 docker-build:
-	docker build --rm -t go-adc:latest .
+	docker build --rm -t go-adc:adc64 .
 
 docker-pub:
-	docker tag go-adc:latest ${DOCKER_IMAGE}:latest
-	docker tag go-adc:latest ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
+	docker tag go-adc:adc64 ${DOCKER_IMAGE}:adc64
+	docker tag go-adc:adc64 ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
+	@echo docker push ${DOCKER_IMAGE}:adc64
 	@echo docker push ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
-	@echo docker push ${DOCKER_IMAGE}:latest
 
 # linting
 LINTER              := golangci-lint
