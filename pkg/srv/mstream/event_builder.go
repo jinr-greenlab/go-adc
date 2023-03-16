@@ -23,7 +23,7 @@ import (
 )
 
 type EventBuilder struct {
-	DeviceName      string
+	deviceName      string
 	Free            bool
 	DeviceSerial    uint32
 	EventNum        uint32
@@ -36,14 +36,14 @@ type EventBuilder struct {
 	Data    map[layers.ChannelNum]*layers.MStreamData
 	Length  uint32
 
-	FragmentCh <-chan *layers.MStreamFragment
-	mpdCh      chan<- []byte
+	defragmentedCh <-chan *layers.MStreamFragment
+	writerCh       chan<- []byte
 }
 
 // NewEvent ...
-func NewEventBuilder(deviceName string, fragmentCh <-chan *layers.MStreamFragment, mpdCh chan<- []byte) *EventBuilder {
+func NewEventBuilder(deviceName string, defragmentedCh <-chan *layers.MStreamFragment, writerCh chan<- []byte) *EventBuilder {
 	return &EventBuilder{
-		DeviceName:      deviceName,
+		deviceName:      deviceName,
 		Free:            true,
 		DeviceSerial:    0,
 		EventNum:        0,
@@ -53,8 +53,8 @@ func NewEventBuilder(deviceName string, fragmentCh <-chan *layers.MStreamFragmen
 		Data:            make(map[layers.ChannelNum]*layers.MStreamData),
 		DataSize:        0,
 		Length:          0,
-		FragmentCh:      fragmentCh,
-		mpdCh:           mpdCh,
+		defragmentedCh:  defragmentedCh,
+		writerCh:        writerCh,
 	}
 }
 
@@ -88,7 +88,7 @@ func (b *EventBuilder) CloseEvent() {
 	}
 	log.Info("Close event: device: %s event: %d\n"+
 		"Data    channels: %064b\n"+
-		"Trigger channels: %064b", b.DeviceName, b.EventNum, b.DataChannels, b.TriggerChannels)
+		"Trigger channels: %064b", b.deviceName, b.EventNum, b.DataChannels, b.TriggerChannels)
 	dataCount := countDataFragments(b.DataChannels)
 	// Total data length is the total length of all data fragments + total length of all MpdMStreamHeader headers
 	// data length + (num data fragments + one trigger fragment) * MStream header size
@@ -124,7 +124,7 @@ func (b *EventBuilder) CloseEvent() {
 		return
 	}
 
-	b.mpdCh <- buf.Bytes()
+	b.writerCh <- buf.Bytes()
 }
 
 // SetFragment ...
@@ -136,7 +136,7 @@ func (b *EventBuilder) SetFragment(f *layers.MStreamFragment) {
 		b.DeviceSerial = f.MStreamPayloadHeader.DeviceSerial
 	} else if b.EventNum != f.MStreamPayloadHeader.EventNum {
 		log.Error("Wrong event number. Force close current event: device: %s event: %d",
-			b.DeviceName, b.EventNum)
+			b.deviceName, b.EventNum)
 		b.CloseEvent()
 	}
 
@@ -162,10 +162,10 @@ func (b *EventBuilder) SetFragment(f *layers.MStreamFragment) {
 }
 
 func (b *EventBuilder) Run() {
-	log.Info("Run EventBuilder: device: %s", b.DeviceName)
+	log.Info("Run EventBuilder: device: %s", b.deviceName)
 	for {
-		f := <-b.FragmentCh
-		log.Info("Setting event fragment: device %s event: %d", b.DeviceName, f.MStreamPayloadHeader.EventNum)
+		f := <-b.defragmentedCh
+		log.Info("Setting event fragment: device %s event: %d", b.deviceName, f.MStreamPayloadHeader.EventNum)
 		b.SetFragment(f)
 	}
 }
