@@ -27,5 +27,4 @@ type ApiClient interface {
 	MStreamPersist(dir, filePrefix string) error
 	MStreamFlush() error
 	ListDevices() ([]*layers.DeviceDescription, error)
-	MStreamConnectToDevices() error
 }
