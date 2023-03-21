@@ -1,4 +1,4 @@
-ARG BUILD_IMAGE=golang:1.17.3-bullseye
+ARG BUILD_IMAGE=golang:1.19.7-bullseye
 ARG RELEASE_IMAGE=debian:bullseye
 
 FROM ${BUILD_IMAGE} as builder
