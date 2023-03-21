@@ -1,0 +1,51 @@
+version: '3.3'
+
+services:
+{%- if discover %}
+  discover-server:
+    environment:
+    - TZ={{ tz }}
+    image: {{ image }}
+    restart: "no"
+    volumes:
+    - {{ config_dir }}:/root/.go-adc
+    network_mode: host
+    command: go-adc discover start
+{%- endif %}
+{%- if mstream %}
+  mstream-server:
+    environment:
+    - TZ={{ tz }}
+    image: {{ image }}
+    restart: "no"
+    volumes:
+    - {{ data_dir }}:/data
+    - {{ config_dir }}:/root/.go-adc
+    network_mode: host
+    command: go-adc mstream start
+{%- if tcpdump %}
+    depends_on:
+    - tcpdump
+{%- endif %}
+{%- endif %}
+{%- if control %}
+  control-server:
+    environment:
+    - TZ={{ tz }}
+    image: {{ image }}
+    restart: "no"
+    volumes:
+    - {{ config_dir }}:/root/.go-adc
+    network_mode: host
+    command: go-adc control start
+{%- endif %}
+{%- if tcpdump %}
+  tcpdump:
+    image: {{ image }}
+    restart: "no"
+    volumes:
+    - {{ data_dir }}:/data
+    network_mode: host
+    user: root
+    command: bash -c "tcpdump -i br0 -s0 -w /data/$$(date +%Y%m%d_%H%M%S).pcap"
+{%- endif %}
