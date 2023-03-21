@@ -79,7 +79,7 @@ func (b *EventBuilder) Clear() {
 	b.Length = 0
 }
 
-func (b *EventBuilder) CloseEvent() {
+func (b *EventBuilder) CloseEvent(notCorrupted bool) {
 	defer b.Clear()
 
 	if b.Trigger == nil {
@@ -124,7 +124,9 @@ func (b *EventBuilder) CloseEvent() {
 		return
 	}
 
-	b.writerCh <- buf.Bytes()
+	if notCorrupted {
+		b.writerCh <- buf.Bytes()
+	}
 }
 
 // SetFragment ...
@@ -137,7 +139,7 @@ func (b *EventBuilder) SetFragment(f *layers.MStreamFragment) {
 	} else if b.EventNum != f.MStreamPayloadHeader.EventNum {
 		log.Error("Wrong event number. Force close current event: device: %s event: %d",
 			b.deviceName, b.EventNum)
-		b.CloseEvent()
+		b.CloseEvent(false)
 	}
 
 	// We substruct 8 bytes from the fragment length because fragment payload has
@@ -150,13 +152,13 @@ func (b *EventBuilder) SetFragment(f *layers.MStreamFragment) {
 		b.TriggerChannels = uint64(f.MStreamTrigger.HiCh)<<32 | uint64(f.MStreamTrigger.LowCh)
 		b.Trigger = f.MStreamTrigger
 		if b.DataChannels == b.TriggerChannels {
-			b.CloseEvent()
+			b.CloseEvent(true)
 		}
 	} else if f.Subtype == layers.MStreamDataSubtype {
 		b.DataChannels |= uint64(1) << f.MStreamPayloadHeader.ChannelNum
 		b.Data[f.MStreamPayloadHeader.ChannelNum] = f.MStreamData
 		if b.Trigger != nil && b.DataChannels == b.TriggerChannels {
-			b.CloseEvent()
+			b.CloseEvent(true)
 		}
 	}
 }

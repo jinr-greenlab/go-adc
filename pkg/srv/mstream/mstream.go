@@ -216,6 +216,7 @@ func (s *MStreamServer) Run() error {
 				var mlDst uint16
 				mlinkLayer := packet.Layer(layers.MLinkLayerType)
 				if mlinkLayer != nil {
+					log.Debug("MLink layer successfully parsed")
 					ml := mlinkLayer.(*layers.MLinkLayer)
 					mlSeq = ml.Seq
 					mlSrc = ml.Src
@@ -224,19 +225,19 @@ func (s *MStreamServer) Run() error {
 
 				mstreamLayer := packet.Layer(layers.MStreamLayerType)
 				if mstreamLayer != nil {
-					log.Debug("MStream frame successfully parsed")
+					log.Debug("MStream layer successfully parsed")
 					ms := mstreamLayer.(*layers.MStreamLayer)
 
 					for _, f := range ms.Fragments {
-						log.Debug("Handling fragment: FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t",
-							f.FragmentID, f.FragmentOffset, f.LastFragment())
+						log.Debug("Handling fragment: %s id: %04x offset: %d length: %d last: %t",
+							deviceName, f.FragmentID, f.FragmentLength, f.FragmentOffset, f.LastFragment())
 
 						fragmentedCh <- f
 
 						ackErr := SendAck(mlDst, mlSrc, mlSeq, f.FragmentID, f.FragmentOffset, udpAddr, conn)
 						if ackErr != nil {
-							log.Error("Error while sending Ack: udpAddr: %s fragment: ID: %d Offset: %d Length: %d",
-								udpAddr, f.FragmentID, f.FragmentOffset, f.FragmentLength)
+							log.Error("Error while sending fragment ack: %s udpAddr: %s id: %04x offset: %d length: %d last: %t",
+								deviceName, udpAddr, f.FragmentID, f.FragmentOffset, f.FragmentLength, f.LastFragment())
 						}
 					}
 				}
@@ -244,6 +245,7 @@ func (s *MStreamServer) Run() error {
 			}
 		}(deviceName, conn, udpAddr, s.fragmentedChs[deviceName], s.outChs[deviceName], counterCh)
 
+		// connect to device
 		errAck := SendAck(layers.MLinkDeviceAddr, 1, 0, 0xffff, 0xffff, udpAddr, conn)
 		if errAck != nil {
 			log.Error("Error while connecting to MStream device: udpAddr: %s", udpAddr)
