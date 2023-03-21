@@ -47,13 +47,12 @@ const (
 
 type MStreamServer struct {
 	srv.Server
-	api               *ApiServer
-	packetDataSources map[string]*PacketSource
-	writerChs         map[string]chan []byte
-	writerStateChs    map[string]chan string
-	fragmentedChs     map[string]chan *layers.MStreamFragment
-	defragmentedChs   map[string]chan *layers.MStreamFragment
-	outChs            map[string]chan srv.OutPacket
+	api             *ApiServer
+	writerChs       map[string]chan []byte
+	writerStateChs  map[string]chan string
+	fragmentedChs   map[string]chan *layers.MStreamFragment
+	defragmentedChs map[string]chan *layers.MStreamFragment
+	outChs          map[string]chan srv.OutPacket
 }
 
 func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, error) {
@@ -64,16 +63,14 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 			Context: ctx,
 			Config:  cfg,
 		},
-		packetDataSources: make(map[string]*PacketSource),
-		writerChs:         make(map[string]chan []byte),
-		writerStateChs:    make(map[string]chan string),
-		fragmentedChs:     make(map[string]chan *layers.MStreamFragment),
-		defragmentedChs:   make(map[string]chan *layers.MStreamFragment),
-		outChs:            make(map[string]chan srv.OutPacket),
+		writerChs:       make(map[string]chan []byte),
+		writerStateChs:  make(map[string]chan string),
+		fragmentedChs:   make(map[string]chan *layers.MStreamFragment),
+		defragmentedChs: make(map[string]chan *layers.MStreamFragment),
+		outChs:          make(map[string]chan srv.OutPacket),
 	}
 
 	for _, device := range cfg.Devices {
-		s.packetDataSources[device.Name] = NewPacketSource()
 		s.writerChs[device.Name] = make(chan []byte, WriterChSize)
 		s.writerStateChs[device.Name] = make(chan string)
 		s.fragmentedChs[device.Name] = make(chan *layers.MStreamFragment, FragmentedChSize)
@@ -332,19 +329,4 @@ func (s *MStreamServer) Persist(dir, filePrefix string) {
 		filename := s.persistFilename(dir, filePrefix, device.Name, timestamp)
 		s.writerStateChs[device.Name] <- filename
 	}
-}
-
-type PacketSource struct {
-	ChIn chan srv.InPacket
-}
-
-func NewPacketSource() *PacketSource {
-	return &PacketSource{
-		ChIn: make(chan srv.InPacket, InChSize),
-	}
-}
-
-func (ps *PacketSource) ReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
-	p := <-ps.ChIn
-	return p.Data, p.CaptureInfo, nil
 }
