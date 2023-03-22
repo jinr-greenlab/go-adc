@@ -39,7 +39,6 @@ const (
 	WriterChSize       = 100
 	FragmentedChSize   = 100
 	DefragmentedChSize = 100
-	InChSize           = 1
 )
 
 const (
@@ -48,15 +47,14 @@ const (
 
 type MStreamServer struct {
 	srv.Server
-	api               *ApiServer
-	packetDataSources map[string]*PacketSource
-	writerChs         map[string]chan []byte
-	writerStateChs    map[string]chan string
-	fragmentedChs     map[string]chan *layers.MStreamFragment
-	defragmentedChs   map[string]chan *layers.MStreamFragment
-	lastEventChs      map[string]chan []byte
-	lastEvent         map[string][]byte
-	mu                sync.RWMutex
+	api             *ApiServer
+	writerChs       map[string]chan []byte
+	writerStateChs  map[string]chan string
+	fragmentedChs   map[string]chan *layers.MStreamFragment
+	defragmentedChs map[string]chan *layers.MStreamFragment
+	lastEventChs    map[string]chan []byte
+	lastEvent       map[string][]byte
+	mu              sync.RWMutex
 }
 
 func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, error) {
@@ -67,18 +65,16 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 			Context: ctx,
 			Config:  cfg,
 		},
-		packetDataSources: make(map[string]*PacketSource),
-		writerChs:         make(map[string]chan []byte),
-		writerStateChs:    make(map[string]chan string),
-		fragmentedChs:     make(map[string]chan *layers.MStreamFragment),
-		defragmentedChs:   make(map[string]chan *layers.MStreamFragment),
-		lastEventChs:      make(map[string]chan []byte),
-		lastEvent:         make(map[string][]byte),
-		mu:                sync.RWMutex{},
+		writerChs:       make(map[string]chan []byte),
+		writerStateChs:  make(map[string]chan string),
+		fragmentedChs:   make(map[string]chan *layers.MStreamFragment),
+		defragmentedChs: make(map[string]chan *layers.MStreamFragment),
+		lastEventChs:    make(map[string]chan []byte),
+		lastEvent:       make(map[string][]byte),
+		mu:              sync.RWMutex{},
 	}
 
 	for _, device := range cfg.Devices {
-		s.packetDataSources[device.Name] = NewPacketSource()
 		s.writerChs[device.Name] = make(chan []byte, WriterChSize)
 		s.writerStateChs[device.Name] = make(chan string)
 		s.fragmentedChs[device.Name] = make(chan *layers.MStreamFragment, FragmentedChSize)
@@ -317,19 +313,4 @@ func (s *MStreamServer) Persist(dir, filePrefix string) {
 		filename := PersistFilename(dir, filePrefix, device.Name, timestamp)
 		s.writerStateChs[device.Name] <- filename
 	}
-}
-
-type PacketSource struct {
-	ChIn chan srv.InPacket
-}
-
-func NewPacketSource() *PacketSource {
-	return &PacketSource{
-		ChIn: make(chan srv.InPacket, InChSize),
-	}
-}
-
-func (ps *PacketSource) ReadPacketData() ([]byte, gopacket.CaptureInfo, error) {
-	p := <-ps.ChIn
-	return p.Data, p.CaptureInfo, nil
 }
