@@ -16,10 +16,9 @@ docker-build:
 
 docker-pub:
 	docker tag go-adc:tqdc ${DOCKER_IMAGE}:tqdc
-#	docker tag go-adc:latest ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
-#	@echo docker push ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
-#	@echo docker push ${DOCKER_IMAGE}:tqdc
-	docker push ${DOCKER_IMAGE}:tqdc
+	docker tag go-adc:tqdc ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
+	@echo docker push ${DOCKER_IMAGE}:tqdc
+	@echo docker push ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
 
 # linting
 LINTER              := golangci-lint
