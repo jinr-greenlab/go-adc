@@ -22,7 +22,12 @@ import (
 	"jinr.ru/greenlab/go-adc/pkg/srv"
 )
 
+const (
+	NumEventBuildersPerManager = 2
+)
+
 type EventBuilder struct {
+	id              int
 	deviceName      string
 	Free            bool
 	DeviceSerial    uint32
@@ -36,13 +41,15 @@ type EventBuilder struct {
 	Data    map[layers.ChannelNum]*layers.MStreamData
 	Length  uint32
 
-	defragmentedCh <-chan *layers.MStreamFragment
+	DefragmentedCh chan *layers.MStreamFragment
 	writerCh       chan<- []byte
+	seq            <-chan uint32
 }
 
 // NewEvent ...
-func NewEventBuilder(deviceName string, defragmentedCh <-chan *layers.MStreamFragment, writerCh chan<- []byte) *EventBuilder {
+func NewEventBuilder(id int, deviceName string, writerCh chan<- []byte, seq <-chan uint32) *EventBuilder {
 	return &EventBuilder{
+		id:              id,
 		deviceName:      deviceName,
 		Free:            true,
 		DeviceSerial:    0,
@@ -53,8 +60,9 @@ func NewEventBuilder(deviceName string, defragmentedCh <-chan *layers.MStreamFra
 		Data:            make(map[layers.ChannelNum]*layers.MStreamData),
 		DataSize:        0,
 		Length:          0,
-		defragmentedCh:  defragmentedCh,
+		DefragmentedCh:  make(chan *layers.MStreamFragment),
 		writerCh:        writerCh,
+		seq:             seq,
 	}
 }
 
@@ -68,8 +76,9 @@ func countDataFragments(channels uint64) (count uint32) {
 }
 
 func (b *EventBuilder) Clear() {
+	//log.Info("Clear event builder: device: %s event: %d", b.deviceName, b.EventNum)
 	b.Free = true
-	b.EventNum = 0
+	//b.EventNum = 0
 	b.TriggerChannels = 0
 	b.DataChannels = 0
 	b.Trigger = nil
@@ -79,16 +88,21 @@ func (b *EventBuilder) Clear() {
 	b.Length = 0
 }
 
-func (b *EventBuilder) CloseEvent(notCorrupted bool) {
+func (b *EventBuilder) CloseEvent(persist bool) {
 	defer b.Clear()
 
 	if b.Trigger == nil {
-		log.Error("Can not close event w/o trigger")
+		log.Error("Can not close event w/o trigger: %s event: %d", b.deviceName, b.EventNum)
 		return
 	}
-	log.Info("Close event: device: %s event: %d\n"+
-		"Data    channels: %064b\n"+
-		"Trigger channels: %064b", b.deviceName, b.EventNum, b.DataChannels, b.TriggerChannels)
+	//log.Info("Close event: %s event: %d\n"+
+	//	"Data    channels: %064b\n"+
+	//	"Trigger channels: %064b", b.deviceName, b.EventNum, b.DataChannels, b.TriggerChannels)
+
+	if !persist {
+		return
+	}
+
 	dataCount := countDataFragments(b.DataChannels)
 	// Total data length is the total length of all data fragments + total length of all MpdMStreamHeader headers
 	// data length + (num data fragments + one trigger fragment) * MStream header size
@@ -120,13 +134,11 @@ func (b *EventBuilder) CloseEvent(notCorrupted bool) {
 	opts := gopacket.SerializeOptions{}
 	err := gopacket.SerializeLayers(buf, opts, mpd)
 	if err != nil {
-		log.Error("Error while serializing Mpd layer: device: %08x, event: %s", b.DeviceSerial, b.EventNum)
+		log.Error("Error while serializing Mpd layer: %s, event: %d", b.deviceName, b.EventNum)
 		return
 	}
 
-	if notCorrupted {
-		b.writerCh <- buf.Bytes()
-	}
+	b.writerCh <- buf.Bytes()
 }
 
 // SetFragment ...
@@ -134,12 +146,8 @@ func (b *EventBuilder) CloseEvent(notCorrupted bool) {
 func (b *EventBuilder) SetFragment(f *layers.MStreamFragment) {
 	if b.Free {
 		b.Free = false
-		b.EventNum = f.MStreamPayloadHeader.EventNum
+		//b.EventNum = f.MStreamPayloadHeader.EventNum
 		b.DeviceSerial = f.MStreamPayloadHeader.DeviceSerial
-	} else if b.EventNum != f.MStreamPayloadHeader.EventNum {
-		log.Error("Wrong event number. Force close current event: device: %s event: %d",
-			b.deviceName, b.EventNum)
-		b.CloseEvent(false)
 	}
 
 	// We substruct 8 bytes from the fragment length because fragment payload has
@@ -164,10 +172,71 @@ func (b *EventBuilder) SetFragment(f *layers.MStreamFragment) {
 }
 
 func (b *EventBuilder) Run() {
-	log.Info("Run EventBuilder: device: %s", b.deviceName)
+	b.EventNum = <-b.seq
+	log.Info("Run EventBuilder: %s id: %d", b.deviceName, b.id)
 	for {
-		f := <-b.defragmentedCh
-		log.Info("Setting event fragment: device %s event: %d", b.deviceName, f.MStreamPayloadHeader.EventNum)
-		b.SetFragment(f)
+		f := <-b.DefragmentedCh
+		if f.MStreamPayloadHeader.EventNum >= b.EventNum+NumEventBuildersPerManager {
+			if !b.Free {
+				//log.Info("Force close event: %s id: %d builder event: %d fragment event: %d",
+				//	b.deviceName, b.id, b.EventNum, f.MStreamPayloadHeader.EventNum)
+				b.CloseEvent(false)
+			}
+			b.EventNum = <-b.seq
+		}
+		if f.MStreamPayloadHeader.EventNum == b.EventNum {
+			//log.Info("Handle event fragment: %s id: %d event: %d fragment: %04x",
+			//	b.deviceName, b.id, f.MStreamPayloadHeader.EventNum, f.FragmentID)
+			b.SetFragment(f)
+		}
 	}
+}
+
+type EventBuilderManager struct {
+	deviceName     string
+	eventBuilders  []*EventBuilder
+	writerCh       chan<- []byte
+	defragmentedCh <-chan *layers.MStreamFragment
+	seq            chan uint32
+}
+
+func NewEventBuilderManager(deviceName string, defragmentedCh <-chan *layers.MStreamFragment, writerCh chan<- []byte) *EventBuilderManager {
+	//log.Info("Creating EventBuilderManager: %s", deviceName)
+	return &EventBuilderManager{
+		deviceName:     deviceName,
+		writerCh:       writerCh,
+		defragmentedCh: defragmentedCh,
+	}
+}
+
+func (m *EventBuilderManager) Run() {
+	log.Info("Run EventBuilderManger: %s", m.deviceName)
+	m.seq = make(chan uint32)
+
+	go func(seq chan uint32) {
+		eventSeq := uint32(1)
+		for {
+			seq <- eventSeq
+			eventSeq++
+		}
+	}(m.seq)
+
+	m.eventBuilders = []*EventBuilder{}
+	for i := 0; i < NumEventBuildersPerManager; i++ {
+		//log.Info("Creating EventBuilder: %s id: %d", m.deviceName, i)
+		b := NewEventBuilder(i, m.deviceName, m.writerCh, m.seq)
+		m.eventBuilders = append(m.eventBuilders, b)
+		go func(eventBuilder *EventBuilder) {
+			eventBuilder.Run()
+		}(b)
+	}
+
+	for {
+		f := <-m.defragmentedCh
+		//log.Info("Handling event fragment: device %s event: %d", m.deviceName, f.MStreamPayloadHeader.EventNum)
+		for _, b := range m.eventBuilders {
+			b.DefragmentedCh <- f
+		}
+	}
+
 }

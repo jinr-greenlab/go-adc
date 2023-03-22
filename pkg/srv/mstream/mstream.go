@@ -16,7 +16,6 @@ package mstream
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -35,8 +34,8 @@ const (
 	DeviceMStreamPort  = 33301
 	ServerMStreamPort  = 0
 	WriterChSize       = 100
-	FragmentedChSize   = 100
-	DefragmentedChSize = 100
+	FragmentedChSize   = 3
+	DefragmentedChSize = 3
 )
 
 const (
@@ -110,7 +109,7 @@ func (s *MStreamServer) Run() error {
 			return errResolve
 		}
 		defragManager := NewDefragManager(deviceName, s.fragmentedChs[deviceName], s.defragmentedChs[deviceName])
-		eventBuilder := NewEventBuilder(deviceName, s.defragmentedChs[deviceName], s.writerChs[deviceName])
+		eventBuilderManager := NewEventBuilderManager(deviceName, s.defragmentedChs[deviceName], s.writerChs[deviceName])
 
 		// Run mpd writers
 		go func(writerStateCh <-chan string, writerCh <-chan []byte) {
@@ -150,9 +149,9 @@ func (s *MStreamServer) Run() error {
 		}(s.writerStateChs[deviceName], s.writerChs[deviceName])
 
 		// Run event builders
-		go func(eventBuilder *EventBuilder) {
-			eventBuilder.Run()
-		}(eventBuilder)
+		go func(eventBuilderManager *EventBuilderManager) {
+			eventBuilderManager.Run()
+		}(eventBuilderManager)
 
 		// Run defragmenter manager
 		go func(defragManager *DefragManager) {
@@ -197,7 +196,6 @@ func (s *MStreamServer) Run() error {
 				var mlDst uint16
 				mlinkLayer := packet.Layer(layers.MLinkLayerType)
 				if mlinkLayer != nil {
-					log.Debug("MLink layer successfully parsed")
 					ml := mlinkLayer.(*layers.MLinkLayer)
 					mlSeq = ml.Seq
 					mlSrc = ml.Src
@@ -206,12 +204,11 @@ func (s *MStreamServer) Run() error {
 
 				mstreamLayer := packet.Layer(layers.MStreamLayerType)
 				if mstreamLayer != nil {
-					log.Debug("MStream layer successfully parsed")
 					ms := mstreamLayer.(*layers.MStreamLayer)
 
 					for _, f := range ms.Fragments {
-						log.Debug("Handling fragment: %s id: %04x offset: %d length: %d last: %t",
-							deviceName, f.FragmentID, f.FragmentLength, f.FragmentOffset, f.LastFragment())
+						//log.Info("Handling fragment: %s fragment id: %04x offset: %d length: %d last: %t",
+						//	deviceName, f.FragmentID, f.FragmentLength, f.FragmentOffset, f.LastFragment())
 
 						fragmentedCh <- f
 
@@ -282,7 +279,7 @@ func SendAck(mlSrc, mlDst, mlSeq, fragmentID, fragmentOffset uint16, udpAddr *ne
 		return err
 	}
 
-	log.Debug("Send MStream Ack: udpaddr: %s fragment: %d ack: %s", udpAddr, fragmentID, hex.EncodeToString(buf.Bytes()))
+	//log.Debug("Send MStream Ack: udpaddr: %s fragment: %d ack: %s", udpAddr, fragmentID, hex.EncodeToString(buf.Bytes()))
 	_, sendErr := conn.WriteToUDP(buf.Bytes(), udpAddr)
 	if sendErr != nil {
 		return sendErr
