@@ -88,7 +88,7 @@ func (b *EventBuilder) Run() {
 	var f *layers.MStreamFragment
 	for {
 		f = <-b.defragmentedCh
-		log.Info("Setting event fragment: device %s event: %d", b.deviceName, f.MStreamPayloadHeader.EventNum)
+		//log.Info("Setting event fragment: device %s event: %d", b.deviceName, f.MStreamPayloadHeader.EventNum)
 		b.HandleFragment(f)
 	}
 }

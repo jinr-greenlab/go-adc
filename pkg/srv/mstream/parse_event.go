@@ -6,8 +6,9 @@ import (
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
-const wordSize = 4
-const mstreamTimeHeaderSize = 8
+const (
+	wordSize = 4
+)
 
 type MstreamHeader struct {
 	EventTimestamp    uint32
@@ -80,9 +81,9 @@ func NewMstreamHeader(d []byte) MstreamHeader {
 	e.Taiflags = buffer[1] & 0x3
 	e.Subtype = 0 // only 0 subtype is present for TQDC (from TQDC2_Data_Format_rev0.pdf)
 
+	mstreamDataSize := int(e.Length / wordSize)
 	if e.Subtype == 0 {
 		doffset := 2
-		mstreamDataSize := int((e.Length - mstreamTimeHeaderSize) / wordSize)
 		for doffset != mstreamDataSize {
 			d1 := buffer[doffset]
 			mstreamDataHeader := MstreamDataHeader{}
@@ -91,7 +92,6 @@ func NewMstreamHeader(d []byte) MstreamHeader {
 			mstreamDataHeader.Spec = uint8((d1 & 0x70000) >> 16)
 			mstreamDataHeader.Length = uint16(d1 & 0xFFFF)
 			doffset++
-
 			if mstreamDataHeader.DataType == 0 { //TDC DATA
 				dataSize := mstreamDataHeader.Length / 4
 				for dataSize != 0 {
@@ -160,6 +160,7 @@ func NewMstreamHeader(d []byte) MstreamHeader {
 					voltage[s*2+1] = uint16((d1 & 0xFFFF0000) >> 16)
 				}
 				adcData.Voltage = voltage
+				mstreamDataHeader.ADCData = adcData
 				doffset += sn / 2
 			}
 			e.MStreamDataHeader = append(e.MStreamDataHeader, mstreamDataHeader)
