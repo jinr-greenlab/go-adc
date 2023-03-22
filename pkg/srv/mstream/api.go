@@ -177,19 +177,20 @@ func (s *ApiServer) handleFlush() http.HandlerFunc {
 
 func (s *ApiServer) handleLastEvent() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if ch, ok := s.mstream.lastEventChs[mux.Vars(r)["deviceName"]]; ok {
+		deviceName := mux.Vars(r)["deviceName"]
+		if ch, ok := s.mstream.lastEventChs[deviceName]; ok {
 			select {
 			case lastEvent := <-ch:
-				w.Write(MstreamHeaderJson(lastEvent))
 				s.mstream.mu.Lock()
-				s.mstream.lastEvent["deviceName"] = lastEvent
+				s.mstream.lastEvent[deviceName] = lastEvent
 				s.mstream.mu.Unlock()
+				w.Write(MstreamHeaderJson(lastEvent))
 			default:
 				s.mstream.mu.RLock()
-				w.Write(MstreamHeaderJson(s.mstream.lastEvent["deviceName"]))
+				lastEvent := s.mstream.lastEvent[deviceName]
 				s.mstream.mu.RUnlock()
+				w.Write(MstreamHeaderJson(lastEvent))
 			}
-			log.Debug("Handling last event request for device ", mux.Vars(r)["deviceName"])
 		} else {
 			http.Error(w, "device not found", http.StatusNotFound)
 		}
