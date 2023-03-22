@@ -40,7 +40,6 @@ const (
 	FragmentedChSize   = 100
 	DefragmentedChSize = 100
 	InChSize           = 1
-	OutChSize          = 10
 )
 
 const (
@@ -55,7 +54,6 @@ type MStreamServer struct {
 	writerStateChs    map[string]chan string
 	fragmentedChs     map[string]chan *layers.MStreamFragment
 	defragmentedChs   map[string]chan *layers.MStreamFragment
-	outChs            map[string]chan srv.OutPacket
 	lastEventChs      map[string]chan []byte
 	lastEvent         map[string][]byte
 	mu                sync.RWMutex
@@ -74,7 +72,6 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 		writerStateChs:    make(map[string]chan string),
 		fragmentedChs:     make(map[string]chan *layers.MStreamFragment),
 		defragmentedChs:   make(map[string]chan *layers.MStreamFragment),
-		outChs:            make(map[string]chan srv.OutPacket),
 		lastEventChs:      make(map[string]chan []byte),
 		lastEvent:         make(map[string][]byte),
 		mu:                sync.RWMutex{},
@@ -86,7 +83,6 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 		s.writerStateChs[device.Name] = make(chan string)
 		s.fragmentedChs[device.Name] = make(chan *layers.MStreamFragment, FragmentedChSize)
 		s.defragmentedChs[device.Name] = make(chan *layers.MStreamFragment, DefragmentedChSize)
-		s.outChs[device.Name] = make(chan srv.OutPacket, OutChSize)
 		s.lastEventChs[device.Name] = make(chan []byte, 1)
 	}
 
@@ -129,20 +125,6 @@ func (s *MStreamServer) Run() error {
 		}
 		defragManager := NewDefragManager(deviceName, s.fragmentedChs[deviceName], s.defragmentedChs[deviceName])
 		eventBuilder := NewEventBuilder(deviceName, s.defragmentedChs[deviceName], s.writerChs[deviceName], s.lastEventChs[deviceName])
-
-		// Read packets from output queue and send them to wire
-		go func(conn *net.UDPConn, chOut <-chan srv.OutPacket) {
-			for {
-				outPacket := <-chOut
-				log.Debug("Sending packet to %s data: \n%s", outPacket.UDPAddr, hex.EncodeToString(outPacket.Data))
-				_, sendErr := conn.WriteToUDP(outPacket.Data, outPacket.UDPAddr)
-				if sendErr != nil {
-					log.Error("Error while sending data to %s", outPacket.UDPAddr)
-					errChan <- sendErr
-					return
-				}
-			}
-		}(conn, s.outChs[deviceName])
 
 		// Run mpd writers
 		go func(writerStateCh <-chan string, writerCh <-chan []byte) {
@@ -202,7 +184,7 @@ func (s *MStreamServer) Run() error {
 		}(counterCh)
 
 		// Run parsers
-		go func(deviceName string, conn *net.UDPConn, udpAddr *net.UDPAddr, fragmentedCh chan<- *layers.MStreamFragment, outCh chan<- srv.OutPacket, counterCh chan<- int) {
+		go func(deviceName string, conn *net.UDPConn, udpAddr *net.UDPAddr, fragmentedCh chan<- *layers.MStreamFragment, counterCh chan<- int) {
 			buffer := make([]byte, InputBufferSize)
 			decodeOptions := gopacket.DecodeOptions{
 				Lazy:   false,
@@ -250,7 +232,7 @@ func (s *MStreamServer) Run() error {
 					}
 				}
 			}
-		}(deviceName, conn, udpAddr, s.fragmentedChs[deviceName], s.outChs[deviceName], counterCh)
+		}(deviceName, conn, udpAddr, s.fragmentedChs[deviceName], counterCh)
 
 		errAck := SendAck(layers.MLinkDeviceAddr, 1, 0, 0xffff, 0xffff, udpAddr, conn)
 		if errAck != nil {
