@@ -16,7 +16,6 @@ package mstream
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -215,8 +214,8 @@ func (s *MStreamServer) Run() error {
 					ms := mstreamLayer.(*layers.MStreamLayer)
 
 					for _, f := range ms.Fragments {
-						log.Debug("Handling fragment: FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t",
-							f.FragmentID, f.FragmentOffset, f.LastFragment())
+						//log.Debug("Handling fragment: FragmentID: 0x%04x FragmentOffset: 0x%04x LastFragment: %t",
+						//	f.FragmentID, f.FragmentOffset, f.LastFragment())
 
 						fragmentedCh <- f
 
@@ -283,7 +282,7 @@ func SendAck(mlSrc, mlDst, mlSeq, fragmentID, fragmentOffset uint16, udpAddr *ne
 		return err
 	}
 
-	log.Debug("Send MStream Ack: udpAddr: %s ack: %s", udpAddr, hex.EncodeToString(buf.Bytes()))
+	//log.Debug("Send MStream Ack: udpAddr: %s ack: %s", udpAddr, hex.EncodeToString(buf.Bytes()))
 	_, sendErr := conn.WriteToUDP(buf.Bytes(), udpAddr)
 	if sendErr != nil {
 		return sendErr
