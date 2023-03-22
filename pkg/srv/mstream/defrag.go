@@ -71,7 +71,7 @@ func NewFragmentBuilder(mgr *DefragManager, fragmentId uint16, defragmentedCh ch
 }
 
 func (b *FragmentBuilder) Clear() {
-	log.Debug("Clear fragment builder: %s id: %d", b.mgr.deviceName, b.FragmentID)
+	//log.Debug("Clear fragment builder: %s id: %d", b.mgr.deviceName, b.FragmentID)
 	b.Free = true
 	b.DeviceID = 0
 	b.Flags = 0
@@ -84,7 +84,7 @@ func (b *FragmentBuilder) Clear() {
 }
 
 func (b *FragmentBuilder) AssembleFragment() {
-	log.Debug("Assemble fragment: %s id: %d", b.mgr.deviceName, b.FragmentID)
+	//log.Debug("Assemble fragment: %s id: %d", b.mgr.deviceName, b.FragmentID)
 	defer b.Clear()
 
 	var data []byte
@@ -94,13 +94,13 @@ func (b *FragmentBuilder) AssembleFragment() {
 		// we don't check the error here since the list contains only MStream fragments
 		f, _ := e.Value.(*layers.MStreamFragment)
 		if f.FragmentOffset == currentOffset { // First fragment must have offset = 0
-			log.Debug("AssembleFragment: %s id: %d offset: %d",
-				b.mgr.deviceName, b.FragmentID, f.FragmentOffset)
+			//log.Debug("AssembleFragment: %s id: %d offset: %d",
+			//	b.mgr.deviceName, b.FragmentID, f.FragmentOffset)
 			data = append(data, f.Data...)
 			currentOffset += f.FragmentLength
 		} else {
-			log.Error("Overlapping fragment or hole found: %s id: %d",
-				b.mgr.deviceName, b.FragmentID)
+			//log.Error("Overlapping fragment or hole found: %s id: %d",
+			//	b.mgr.deviceName, b.FragmentID)
 			return
 		}
 	}
@@ -134,17 +134,17 @@ func (b *FragmentBuilder) HandleFragmentPart(f *layers.MStreamFragment) {
 	}
 
 	if f.FragmentOffset >= b.Highest {
-		log.Debug("Fragment append: %s id: %04x offset: %04x", b.mgr.deviceName, b.FragmentID, f.FragmentOffset)
+		//log.Debug("Fragment append: %s id: %04x offset: %04x", b.mgr.deviceName, b.FragmentID, f.FragmentOffset)
 		b.Parts.PushBack(f)
 	} else {
-		log.Debug("Fragment not in order: %s id: %04x offset: %04x", b.mgr.deviceName, b.FragmentID, f.FragmentOffset)
+		//log.Debug("Fragment not in order: %s id: %04x offset: %04x", b.mgr.deviceName, b.FragmentID, f.FragmentOffset)
 		for e := b.Parts.Front(); e != nil; e = e.Next() {
 			// we don't check the error here the list contains only MStream fragments
 			frag, _ := e.Value.(*layers.MStreamFragment)
 
 			if f.FragmentOffset == frag.FragmentOffset {
-				log.Debug("Fragment duplication: %s id: %04x offset: %04x",
-					b.mgr.deviceName, b.FragmentID, f.FragmentOffset)
+				//log.Debug("Fragment duplication: %s id: %04x offset: %04x",
+				//	b.mgr.deviceName, b.FragmentID, f.FragmentOffset)
 				return
 			}
 
@@ -161,8 +161,8 @@ func (b *FragmentBuilder) HandleFragmentPart(f *layers.MStreamFragment) {
 	}
 	b.TotalLength += f.FragmentLength
 
-	log.Debug("Fragment builder: %s id: %04x count: %d highest: %d total: %d",
-		b.mgr.deviceName, b.FragmentID, b.Parts.Len(), b.Highest, b.TotalLength)
+	//log.Debug("Fragment builder: %s id: %04x count: %d highest: %d total: %d",
+	//	b.mgr.deviceName, b.FragmentID, b.Parts.Len(), b.Highest, b.TotalLength)
 
 	if f.LastFragment() {
 		b.LastFragmentReceived = true
@@ -171,7 +171,7 @@ func (b *FragmentBuilder) HandleFragmentPart(f *layers.MStreamFragment) {
 	// Last fragment received and the total length of all fragments corresponds
 	// to the end of the last fragment which means there are no missing fragments.
 	if b.LastFragmentReceived && b.Highest == b.TotalLength {
-		log.Debug("Fragment completed: %s id: %04x", b.mgr.deviceName, b.FragmentID)
+		//log.Debug("Fragment completed: %s id: %04x", b.mgr.deviceName, b.FragmentID)
 		b.Completed = true
 	}
 
@@ -219,8 +219,8 @@ func (m *DefragManager) Run() {
 	var f *layers.MStreamFragment
 	for {
 		f = <-m.FragmentedCh
-		log.Debug("Got fragment part: %s id: %04x offset: %d length: %d last: %t",
-			m.deviceName, f.FragmentID, f.FragmentOffset, f.FragmentLength, f.LastFragment())
+		//log.Debug("Got fragment part: %s id: %04x offset: %d length: %d last: %t",
+		//	m.deviceName, f.FragmentID, f.FragmentOffset, f.FragmentLength, f.LastFragment())
 		m.fragmentBuilders[f.FragmentID].FragmentedCh <- f
 	}
 }

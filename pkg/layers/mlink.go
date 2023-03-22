@@ -170,7 +170,6 @@ func (ml *MLinkLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) e
 	}
 
 	if binary.LittleEndian.Uint16(data[2:4]) != MLinkSync {
-		log.Debug("Mlink sync is invalid")
 		return errors.New(fmt.Sprintf("Wrong MLink sync. Must be %d", MLinkSync))
 	}
 

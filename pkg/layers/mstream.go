@@ -16,13 +16,10 @@ package layers
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-
-	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
 const (
@@ -107,13 +104,13 @@ func (h *MStreamPayloadHeader) Serialize(buf []byte) error {
 
 // Serialize MStreamTrigger ...
 func (t *MStreamTrigger) Serialize(buf []byte) error {
-	log.Debug("MStreamTrigger.Serialize: TaiSec: %d", t.TaiSec)
-	log.Debug("MStreamTrigger.Serialize: hex TaiSec: %08x", t.TaiSec)
-	log.Debug("MStreamTrigger.Serialize: TaiNSec: %d", t.TaiNSec)
-	log.Debug("MStreamTrigger.Serialize: Flags: %d", t.Flags)
-	log.Debug("MStreamTrigger.Serialize: hex TaiNSec/Flags: %08x", (t.TaiNSec<<2 | uint32(t.Flags)))
-	log.Debug("MStreamTrigger.Serialize: LowCh: %d", t.LowCh)
-	log.Debug("MStreamTrigger.Serialize: HiCh: %d", t.HiCh)
+	//log.Debug("MStreamTrigger.Serialize: TaiSec: %d", t.TaiSec)
+	//log.Debug("MStreamTrigger.Serialize: hex TaiSec: %08x", t.TaiSec)
+	//log.Debug("MStreamTrigger.Serialize: TaiNSec: %d", t.TaiNSec)
+	//log.Debug("MStreamTrigger.Serialize: Flags: %d", t.Flags)
+	//log.Debug("MStreamTrigger.Serialize: hex TaiNSec/Flags: %08x", (t.TaiNSec<<2 | uint32(t.Flags)))
+	//log.Debug("MStreamTrigger.Serialize: LowCh: %d", t.LowCh)
+	//log.Debug("MStreamTrigger.Serialize: HiCh: %d", t.HiCh)
 
 	binary.LittleEndian.PutUint32(buf[0:4], t.TaiSec)
 	binary.LittleEndian.PutUint32(buf[4:8], (t.TaiNSec<<2 | uint32(t.Flags)))
@@ -159,9 +156,9 @@ func DecodeMStreamPayloadHeader(fragmentPayload []byte) (*MStreamPayloadHeader, 
 	eventNumBytes := make([]byte, 4)
 	copy(eventNumBytes, fragmentPayload[4:7])
 
-	log.Debug("DecodeMStreamPayloadHeader: DeviceSerial: %08x", binary.LittleEndian.Uint32(fragmentPayload[0:4]))
-	log.Debug("DecodeMStreamPayloadHeader: EventNum: %d", binary.LittleEndian.Uint32(eventNumBytes))
-	log.Debug("DecodeMStreamPayloadHeader: ChannelNum: %d", fragmentPayload[7])
+	//log.Debug("DecodeMStreamPayloadHeader: DeviceSerial: %08x", binary.LittleEndian.Uint32(fragmentPayload[0:4]))
+	//log.Debug("DecodeMStreamPayloadHeader: EventNum: %d", binary.LittleEndian.Uint32(eventNumBytes))
+	//log.Debug("DecodeMStreamPayloadHeader: ChannelNum: %d", fragmentPayload[7])
 
 	return &MStreamPayloadHeader{
 		DeviceSerial: binary.LittleEndian.Uint32(fragmentPayload[0:4]),
@@ -178,11 +175,11 @@ func DecodeMStreamTrigger(fragmentPayload []byte) (*MStreamTrigger, error) {
 
 	taiNSecFlags := binary.LittleEndian.Uint32(fragmentPayload[12:16])
 
-	log.Debug("DecodeMStreamTrigger: TaiSec: %d", binary.LittleEndian.Uint32(fragmentPayload[8:12]))
-	log.Debug("DecodeMStreamTrigger: Flags: %d", uint8(taiNSecFlags&0x3))
-	log.Debug("DecodeMStreamTrigger: TaiNSec: %d", taiNSecFlags>>2)
-	log.Debug("DecodeMStreamTrigger: LowCh: %d", binary.LittleEndian.Uint32(fragmentPayload[16:20]))
-	log.Debug("DecodeMStreamTrigger: HiCh: %d", binary.LittleEndian.Uint32(fragmentPayload[20:24]))
+	//log.Debug("DecodeMStreamTrigger: TaiSec: %d", binary.LittleEndian.Uint32(fragmentPayload[8:12]))
+	//log.Debug("DecodeMStreamTrigger: Flags: %d", uint8(taiNSecFlags&0x3))
+	//log.Debug("DecodeMStreamTrigger: TaiNSec: %d", taiNSecFlags>>2)
+	//log.Debug("DecodeMStreamTrigger: LowCh: %d", binary.LittleEndian.Uint32(fragmentPayload[16:20]))
+	//log.Debug("DecodeMStreamTrigger: HiCh: %d", binary.LittleEndian.Uint32(fragmentPayload[20:24]))
 
 	return &MStreamTrigger{
 		TaiSec:  binary.LittleEndian.Uint32(fragmentPayload[8:12]),
@@ -195,7 +192,7 @@ func DecodeMStreamTrigger(fragmentPayload []byte) (*MStreamTrigger, error) {
 
 // DecodeMStreamData ...
 func DecodeMStreamData(fragmentPayload []byte) (*MStreamData, error) {
-	log.Debug("DecodeMStreamData: Bytes:\n%s", hex.Dump(fragmentPayload[8:]))
+	//log.Debug("DecodeMStreamData: Bytes:\n%s", hex.Dump(fragmentPayload[8:]))
 	return &MStreamData{
 		Bytes: fragmentPayload[8:],
 	}, nil
@@ -205,8 +202,8 @@ func DecodeMStreamData(fragmentPayload []byte) (*MStreamData, error) {
 // offset is the beginning of MStream fragment inside MStream packet
 // data is the whole MStream packet
 func (ms *MStreamLayer) DecodeFragment(offset int, data []byte) (int, error) {
-	log.Debug("DecodeFragment: ~~~~~~~")
-	log.Debug("DecodeFragment: offset: %d", offset)
+	//log.Debug("DecodeFragment: ~~~~~~~")
+	//log.Debug("DecodeFragment: offset: %d", offset)
 
 	// Decoding fragment header
 	fragmentLength := binary.LittleEndian.Uint16(data[offset : offset+2])
@@ -215,8 +212,8 @@ func (ms *MStreamLayer) DecodeFragment(offset int, data []byte) (int, error) {
 	}
 	// end of fragment is current offset + size of fragment header + fragment length
 	newOffset := offset + 8 + int(fragmentLength)
-	log.Debug("DecodeFragment: newOffset: %d", newOffset)
-	log.Debug("DecodeFragment: fragment data: \n%s", hex.Dump(data[offset:newOffset]))
+	//log.Debug("DecodeFragment: newOffset: %d", newOffset)
+	//log.Debug("DecodeFragment: fragment data: \n%s", hex.Dump(data[offset:newOffset]))
 
 	subtype := data[offset+2] & 0x3       // Subtype is two least significant bits
 	flags := (data[offset+2] >> 2) & 0x3f // Flags is six high bits
@@ -225,12 +222,12 @@ func (ms *MStreamLayer) DecodeFragment(offset int, data []byte) (int, error) {
 	fragmentID := uint16(fragmentOffsetID >> 16)        // FragmentID takes 2 bytes for MStream 2.x
 	fragmentOffset := uint16(fragmentOffsetID & 0xffff) // FragmentOffset takes 2 bytes for MStream 2.x
 
-	log.Debug("DecodeFragment: FragmentLength: %d", fragmentLength)
-	log.Debug("DecodeFragment: Subtype: %d", subtype)
-	log.Debug("DecodeFragment: Flags: %d", flags)
-	log.Debug("DecodeFragment: DeviceID: %d", deviceID)
-	log.Debug("DecodeFragment: FragmentID: %d", fragmentID)
-	log.Debug("DecodeFragment: FragmentOffset: %d", fragmentOffset)
+	//log.Debug("DecodeFragment: FragmentLength: %d", fragmentLength)
+	//log.Debug("DecodeFragment: Subtype: %d", subtype)
+	//log.Debug("DecodeFragment: Flags: %d", flags)
+	//log.Debug("DecodeFragment: DeviceID: %d", deviceID)
+	//log.Debug("DecodeFragment: FragmentID: %d", fragmentID)
+	//log.Debug("DecodeFragment: FragmentOffset: %d", fragmentOffset)
 
 	fragment := &MStreamFragment{
 		FragmentLength: fragmentLength,
@@ -248,9 +245,9 @@ func (ms *MStreamLayer) DecodeFragment(offset int, data []byte) (int, error) {
 }
 
 func (ms *MStreamLayer) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
-	log.Debug("DecodeFromBytes: decoding MStream layer")
-	log.Debug("DecodeFromBytes: data length: %d", len(data))
-	log.Debug("DecodeFromBytes: data: \n%s", hex.Dump(data))
+	//log.Debug("DecodeFromBytes: decoding MStream layer")
+	//log.Debug("DecodeFromBytes: data length: %d", len(data))
+	//log.Debug("DecodeFromBytes: data: \n%s", hex.Dump(data))
 
 	// At least one fragment must be in the packet and fragment header length is 8
 	if len(data) < 8 {
@@ -305,8 +302,8 @@ func (f *MStreamFragment) SetAck(ack bool) {
 // It is assumed to be one of MStreamTrigger or MStreamData
 // This method must be called only for defragmented (assembled) frames
 func (f *MStreamFragment) DecodePayload() error {
-	log.Debug("DecodePayload: length: %d", len(f.Data))
-	log.Debug("DecodePayload: data: \n%s\n", hex.Dump(f.Data))
+	//log.Debug("DecodePayload: length: %d", len(f.Data))
+	//log.Debug("DecodePayload: data: \n%s\n", hex.Dump(f.Data))
 	payloadHeader, err := DecodeMStreamPayloadHeader(f.Data)
 	if err != nil {
 		return errors.New("Error while decoding payload header of MStream fragment")
