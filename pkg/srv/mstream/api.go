@@ -189,7 +189,11 @@ func (s *ApiServer) handleLastEvent() http.HandlerFunc {
 				s.mstream.mu.RLock()
 				lastEvent := s.mstream.lastEvent[deviceName]
 				s.mstream.mu.RUnlock()
-				w.Write(MstreamHeaderJson(lastEvent))
+				if len(lastEvent) != 0 {
+					w.Write(MstreamHeaderJson(lastEvent))
+				} else {
+					http.Error(w, "no content", http.StatusNoContent)
+				}
 			}
 		} else {
 			http.Error(w, "device not found", http.StatusNotFound)
