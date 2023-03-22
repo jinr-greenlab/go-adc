@@ -204,15 +204,3 @@ func (c *ApiClient) ListDevices() ([]*layers.DeviceDescription, error) {
 	}
 	return devices, nil
 }
-
-// MStreamConnectToDevices ...
-func (c *ApiClient) MStreamConnectToDevices() error {
-	r, err := req.Get(fmt.Sprintf("%s/connect_to_devices", c.MStreamApiPrefix))
-	if err != nil {
-		return err
-	}
-	if r.Response().StatusCode != 200 {
-		return errors.New(r.Response().Status)
-	}
-	return nil
-}

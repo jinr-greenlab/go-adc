@@ -259,11 +259,6 @@ func (s *MStreamServer) Run() error {
 		}
 	}
 
-	//errConnect := s.ConnectToDevices()
-	//if errConnect != nil {
-	//	return errConnect
-	//}
-
 	go func() {
 		s.api.Run()
 	}()
@@ -317,25 +312,6 @@ func SendAck(mlSrc, mlDst, mlSeq, fragmentID, fragmentOffset uint16, udpAddr *ne
 	}
 	return nil
 }
-
-//func (s *MStreamServer) ConnectToDevices() error {
-//	log.Info("~~~~~~~~~~~~~~~~~~~~ ConnectToDevices")
-//	// to connect to peer devices it is enough to send them an MStream ack
-//	// message with empty payload and with fragmentID = -1 and fragmentOffset = -1
-//	for _, device := range s.Config.Devices {
-//		log.Info("~~~~~~~~~ ConnectToDevices: %s", device.IP)
-//		udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", device.IP, DeviceMStreamPort))
-//		if err != nil {
-//			return err
-//		}
-//		err = s.SendAck(layers.MLinkDeviceAddr, 1, 0, 0xffff, 0xffff, udpAddr, s.outChs[device.Name])
-//		if err != nil {
-//			log.Error("Error while connecting to MStream device %s:%s", device.IP, DeviceMStreamPort)
-//			return err
-//		}
-//	}
-//	return nil
-//}
 
 func PersistFilename(dir, prefix, name, suffix string) string {
 	filename := fmt.Sprintf("%s_%s.data", name, suffix)

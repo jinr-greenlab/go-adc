@@ -200,13 +200,3 @@ func (s *ApiServer) handleLastEvent() http.HandlerFunc {
 		}
 	}
 }
-
-//func (s *ApiServer) handleConnectToDevices() http.HandlerFunc {
-//	return func(w http.ResponseWriter, r *http.Request) {
-//		log.Debug("Handling connect to devices request")
-//		err := s.mstream.ConnectToDevices()
-//		if err != nil {
-//			http.Error(w, err.Error(), http.StatusBadGateway)
-//		}
-//	}
-//}
