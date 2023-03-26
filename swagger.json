@@ -1,0 +1,135 @@
+{
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "http"
+  ],
+  "swagger": "2.0",
+  "info": {
+    "description": "RESTful APIs to interact with go-adc64 server",
+    "title": "go-adc64 API",
+    "contact": {},
+    "version": "1.0.0"
+  },
+  "host": "localhost:8003",
+  "paths": {
+    "/connect_to_devices": {
+      "get": {
+        "description": "--",
+        "tags": [
+          "mstream"
+        ],
+        "summary": "connects mstream to adc boards",
+        "operationId": "getConnect",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/okResp"
+          },
+          "400": {
+            "$ref": "#/responses/badReq"
+          }
+        }
+      }
+    },
+    "/devices": {
+      "get": {
+        "description": "If the list exists, it will be returned else null will be returned.",
+        "tags": [
+          "devices"
+        ],
+        "summary": "Return a list of discovered devices",
+        "operationId": "getDevices",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/okResp"
+          },
+          "400": {
+            "$ref": "#/responses/badReq"
+          }
+        }
+      }
+    },
+    "/flush": {
+      "get": {
+        "description": "--",
+        "tags": [
+          "mstream"
+        ],
+        "summary": "flush mstream",
+        "operationId": "getFlush",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/okResp"
+          },
+          "400": {
+            "$ref": "#/responses/badReq"
+          }
+        }
+      }
+    },
+    "/persist": {
+      "post": {
+        "description": "--",
+        "tags": [
+          "mstream"
+        ],
+        "summary": "checks if mstream persist",
+        "operationId": "getMstream",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/okResp"
+          },
+          "400": {
+            "$ref": "#/responses/badReq"
+          }
+        }
+      }
+    }
+  },
+  "responses": {
+    "badReq": {
+      "description": "",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "description": "HTTP status code 400 -  Bad Request",
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Code"
+          }
+        }
+      }
+    },
+    "okResp": {
+      "description": "Success response",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "description": "HTTP status code 200 - OK",
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Code"
+          }
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "api_key": {
+      "type": "apiKey",
+      "name": "KEY",
+      "in": "header"
+    }
+  },
+  "security": [
+    {
+      "api_key": []
+    }
+  ]
+}
