@@ -14,29 +14,29 @@
 
 // go-adc64 API
 //
-// RESTful APIs to interact with go-adc64 server
+// # RESTful APIs to interact with go-adc64 server
 //
 // Terms Of Service:
 //
-//     Schemes: http
-//     Host: localhost:8003
-//     Version: 1.0.0
-//     Contact:
+//	Schemes: http
+//	Host: localhost:8003
+//	Version: 1.0.0
+//	Contact:
 //
-//     Consumes:
-//     - application/json
+//	Consumes:
+//	- application/json
 //
-//     Produces:
-//     - application/json
+//	Produces:
+//	- application/json
 //
-//     Security:
-//     - api_key:
+//	Security:
+//	- api_key:
 //
-//     SecurityDefinitions:
-//     api_key:
-//          type: apiKey
-//          name: KEY
-//          in: header
+//	SecurityDefinitions:
+//	api_key:
+//	     type: apiKey
+//	     name: KEY
+//	     in: header
 //
 // swagger:meta
 package mstream
@@ -45,16 +45,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
-
+	"github.com/go-openapi/loads"
+	"github.com/go-openapi/runtime/middleware"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-
 	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/log"
+	"net/http"
 )
 
 const (
-	ApiPort = 8001
+	ApiPort         = 8001
+	SwaggerBasePath = "/"
+	SwaggerPath     = "swagger"
+	SwaggerSpec     = "swagger.json"
 )
 
 // Success response
@@ -101,7 +105,10 @@ func NewApiServer(ctx context.Context, cfg *config.Config, mstream *MStreamServe
 // Start
 func (s *ApiServer) Run() error {
 	log.Info("Starting API server: address: %s port: %d", s.Config.IP, ApiPort)
-	s.configureRouter()
+	err := s.configureRouter()
+	if err != nil {
+		return err
+	}
 	httpServer := &http.Server{
 		Handler: s.Router,
 		Addr:    fmt.Sprintf("%s:%d", s.Config.IP, ApiPort),
@@ -109,7 +116,7 @@ func (s *ApiServer) Run() error {
 	return httpServer.ListenAndServe()
 }
 
-func (s *ApiServer) configureRouter() {
+func (s *ApiServer) configureRouter() error {
 	s.Router = mux.NewRouter()
 	subRouter := s.Router.PathPrefix("/api").Subrouter()
 	// swagger:operation POST /persist mstream getMstream
@@ -132,7 +139,10 @@ func (s *ApiServer) configureRouter() {
 	//   "400":
 	//     "$ref": "#/responses/badReq"
 	subRouter.HandleFunc("/flush", s.handleFlush()).Methods("GET")
-	s.Router.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", http.FileServer(http.Dir("./swaggerui/"))))
+
+	s.Router.Handle("/swagger.json", s.getSwaggerSpecHandler()).Methods("GET")
+	s.Router.Handle("/swagger", s.getSwaggerUIHandler()).Methods("GET")
+	return nil
 }
 
 func (s *ApiServer) handlePersist() http.HandlerFunc {
@@ -154,4 +164,28 @@ func (s *ApiServer) handleFlush() http.HandlerFunc {
 		log.Debug("Handling flush request")
 		s.mstream.Flush()
 	}
+}
+
+func (s *ApiServer) getSwaggerSpecHandler() http.Handler {
+	return handlers.CORS()(http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		specDoc, err := loads.Spec(SwaggerSpec)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		bytes, err := json.MarshalIndent(specDoc.Spec(), "", "  ")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_, _ = w.Write(bytes)
+	})))
+}
+
+func (s *ApiServer) getSwaggerUIHandler() http.Handler {
+	return middleware.SwaggerUI(middleware.SwaggerUIOpts{
+		BasePath: "/",
+		SpecURL:  "/swagger.json",
+		Path:     "swagger",
+	}, nil)
 }
