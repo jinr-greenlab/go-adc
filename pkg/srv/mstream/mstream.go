@@ -51,9 +51,14 @@ type MStreamServer struct {
 	writerStateChs  map[string]chan string
 	fragmentedChs   map[string]chan *layers.MStreamFragment
 	defragmentedChs map[string]chan *layers.MStreamFragment
-	lastEventChs    map[string]chan []byte
-	lastEvent       map[string][]byte
+	lastEventChs    map[string]chan LastEvent
+	lastEvent       map[string]LastEvent
 	mu              sync.RWMutex
+}
+
+type LastEvent struct {
+	EventNumber uint32
+	Data        []byte
 }
 
 func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, error) {
@@ -68,8 +73,8 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 		writerStateChs:  make(map[string]chan string),
 		fragmentedChs:   make(map[string]chan *layers.MStreamFragment),
 		defragmentedChs: make(map[string]chan *layers.MStreamFragment),
-		lastEventChs:    make(map[string]chan []byte),
-		lastEvent:       make(map[string][]byte),
+		lastEventChs:    make(map[string]chan LastEvent),
+		lastEvent:       make(map[string]LastEvent),
 		mu:              sync.RWMutex{},
 	}
 
@@ -78,7 +83,7 @@ func NewMStreamServer(ctx context.Context, cfg *config.Config) (*MStreamServer, 
 		s.writerStateChs[device.Name] = make(chan string)
 		s.fragmentedChs[device.Name] = make(chan *layers.MStreamFragment, FragmentedChSize)
 		s.defragmentedChs[device.Name] = make(chan *layers.MStreamFragment, DefragmentedChSize)
-		s.lastEventChs[device.Name] = make(chan []byte, 1)
+		s.lastEventChs[device.Name] = make(chan LastEvent, 1)
 	}
 
 	apiServer, err := NewApiServer(ctx, cfg, s)

@@ -25,11 +25,11 @@ type EventBuilder struct {
 	deviceName     string
 	defragmentedCh <-chan *layers.MStreamFragment
 	writerCh       chan<- []byte
-	lastEventCh    chan []byte
+	lastEventCh    chan LastEvent
 }
 
 // NewEventBuilder ...
-func NewEventBuilder(deviceName string, defragmentedCh <-chan *layers.MStreamFragment, writerCh chan<- []byte, lastEventCh chan []byte) *EventBuilder {
+func NewEventBuilder(deviceName string, defragmentedCh <-chan *layers.MStreamFragment, writerCh chan<- []byte, lastEventCh chan LastEvent) *EventBuilder {
 	return &EventBuilder{
 		deviceName:     deviceName,
 		defragmentedCh: defragmentedCh,
@@ -74,9 +74,9 @@ func (b *EventBuilder) HandleFragment(f *layers.MStreamFragment) {
 
 	select {
 	case <-b.lastEventCh:
-		b.lastEventCh <- f.Data
+		b.lastEventCh <- LastEvent{f.MStreamPayloadHeader.EventNum, f.Data}
 	default:
-		b.lastEventCh <- f.Data
+		b.lastEventCh <- LastEvent{f.MStreamPayloadHeader.EventNum, f.Data}
 	}
 
 	b.writerCh <- buf.Bytes()

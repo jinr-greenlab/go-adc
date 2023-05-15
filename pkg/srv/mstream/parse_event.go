@@ -3,6 +3,7 @@ package mstream
 import (
 	"encoding/binary"
 	"encoding/json"
+
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
 
@@ -66,6 +67,17 @@ type AdcData struct {
 	Timestamp uint16
 	Length    uint16
 	Voltage   []uint16
+}
+
+type RepeatToApi struct {
+	EventNumber    uint32
+	Timestamp      uint32
+	ChannelVoltage []ChannelVoltage
+}
+
+type ChannelVoltage struct {
+	Channel uint8
+	Voltage []uint16
 }
 
 // Encode []byte to struct Mstrean signal doc from TQDC2_Data_Format_rev0.pdf and tqdc16vs.py
@@ -170,9 +182,24 @@ func NewMstreamHeader(d []byte) MstreamHeader {
 	return e
 }
 
-func MstreamHeaderJson(d []byte) []byte {
-	e := NewMstreamHeader(d)
-	eJson, err := json.Marshal(e)
+func BuildStructToApi(Ev MstreamHeader, EventNumber uint32) RepeatToApi {
+	RepeatToApi := RepeatToApi{}
+	RepeatToApi.EventNumber = EventNumber
+	RepeatToApi.Timestamp = Ev.EventTimestamp
+	for _, c := range Ev.MStreamDataHeader {
+		ChannelVoltage := ChannelVoltage{}
+		ChannelVoltage.Channel = c.Channel
+		ChannelVoltage.Voltage = c.ADCData.Voltage
+		RepeatToApi.ChannelVoltage = append(RepeatToApi.ChannelVoltage, ChannelVoltage)
+	}
+
+	return RepeatToApi
+}
+
+func MstreamHeaderJson(d LastEvent) []byte {
+	e := NewMstreamHeader(d.Data)
+	n := BuildStructToApi(e, d.EventNumber)
+	eJson, err := json.Marshal(n)
 	if err != nil {
 		log.Error("Error Marshal data %s", d) //what is better to do?
 		eJson = []byte{}
