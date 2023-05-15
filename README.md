@@ -5,8 +5,17 @@ logLevel: debug # must be one of error, warning, info, debug
 devices:
 - name: one
   ip: 192.168.1.101
+  inventory:
+    crateID: 0
+    slotID: 0
 - name: two
   ip: 192.168.1.102
+  inventory:
+    crateID: 0
+    slotID: 1
+inventory:
+  version: 0
+  detectorID: 33 # NDLAr
 discoverIP: 239.192.1.1
 discoverIface: eth0
 ip: 192.168.1.100

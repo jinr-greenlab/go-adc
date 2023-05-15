@@ -49,6 +49,16 @@ type ZsSetup struct {
 	Zs bool
 }
 
+type Inventory struct {
+	Version    uint8 `json:"version"`
+	DetectorID uint8 `json:"detectorID"` // 33 for NDLAr
+}
+
+type DeviceInventory struct {
+	CrateID uint16 `json:"crateID"`
+	SlotID  uint8  `json:"slotID"`
+}
+
 type Device struct {
 	Name                string  `json:"name,omitempty"`
 	IP                  *net.IP `json:"ip,omitempty"`
@@ -57,14 +67,16 @@ type Device struct {
 	*InvertSetup        `json:"InvertSetup,omitempty"`
 	*ReadoutWindowSetup `json:"ReadoutWindowSetup,omitempty"`
 	*ZsSetup            `json:"ZsSetup,omitempty"`
+	*DeviceInventory    `json:"inventory,omitempty"`
 }
 
 type Config struct {
-	LogLevel      string    `json:"logLevel,omitempty"`
-	DiscoverIP    *net.IP   `json:"discoverIP,omitempty"`
-	DiscoverIface string    `json:"discoverIface,omitempty"`
-	IP            *net.IP   `json:"ip,omitempty"`
-	Devices       []*Device `json:"devices"`
+	LogLevel      string     `json:"logLevel,omitempty"`
+	DiscoverIP    *net.IP    `json:"discoverIP,omitempty"`
+	DiscoverIface string     `json:"discoverIface,omitempty"`
+	IP            *net.IP    `json:"ip,omitempty"`
+	Devices       []*Device  `json:"devices"`
+	Inventory     *Inventory `json:"inventory,omitempty"`
 	dirpath       string
 }
 
@@ -147,12 +159,28 @@ func NewDefaultConfig() *Config {
 	discoverIP := net.ParseIP(DefaultDiscoverIP)
 	ip := net.ParseIP(DefaultIP)
 
+	deviceIP := net.ParseIP(DefaultDeviceIP)
+	device := Device{
+		Name: DefaultDeviceName,
+		IP:   &deviceIP,
+		DeviceInventory: &DeviceInventory{
+			CrateID: DefaultDeviceInventoryCrateID,
+			SlotID:  DefaultDeviceInventorySlotID,
+		},
+	}
+
 	return &Config{
 		LogLevel:      DefaultLogLevel,
 		DiscoverIP:    &discoverIP,
 		DiscoverIface: DefaultDiscoverIface,
 		IP:            &ip,
-		Devices:       []*Device{},
-		dirpath:       DefaultConfigDir(),
+		Devices: []*Device{
+			&device,
+		},
+		Inventory: &Inventory{
+			Version:    DefaultInventoryVersion,
+			DetectorID: DefaultInventoryDetectorID,
+		},
+		dirpath: DefaultConfigDir(),
 	}
 }

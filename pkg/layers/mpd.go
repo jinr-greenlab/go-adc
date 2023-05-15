@@ -35,6 +35,7 @@ const (
 // MpdLayer ...
 type MpdLayer struct {
 	layers.BaseLayer
+	*MpdInventoryHeader
 	*MpdTimestampHeader
 	*MpdEventHeader
 	*MpdDeviceHeader
@@ -48,6 +49,19 @@ var MpdLayerType = gopacket.RegisterLayerType(MpdLayerNum,
 // LayerType returns the type of the Mpd layer in the layer catalog
 func (ms *MpdLayer) LayerType() gopacket.LayerType {
 	return MpdLayerType
+}
+
+// MpdDuneHeader ... 16 bytes
+type MpdInventoryHeader struct {
+	Version    uint8  // 6 bits
+	DetectorID uint8  // 6 bits
+	CrateID    uint16 // 10 bits
+	SlotID     uint8  // 4 bits
+	StreamID   uint8  // 8 bits // always 0 for our case since we have 1 data stream per slot/device
+	Reserved   uint8  // 6 bits // not used at this point
+	SequenceID uint16 // 12 bits // data block sequence number, in our case it can be event number
+	Length     uint16 // 12 bits // data block length in 64-bit words
+	Timestamp  uint64 // this is the event precise timestamp taken from WR
 }
 
 // lib-common/MpdRawTypes.h
@@ -78,6 +92,20 @@ type MpdMStreamHeader struct {
 	Subtype           // 2 bits 0-1
 	Length     uint32 // 22 bits 2-23 // payload length in 32-bit words
 	ChannelNum        // 8 bits 24-31
+}
+
+// Serialize MpdDuneHeader
+func (h *MpdInventoryHeader) Serialize(buf []byte) error {
+	buf[0] = uint8((h.Version&0x3f)<<2) | uint8((h.DetectorID&0x30)>>4)
+	buf[1] = uint8((h.DetectorID&0xf)<<4) | uint8((h.CrateID&0x3c0)>>6)
+	buf[2] = uint8((h.CrateID&0x3f)<<2) | uint8((h.SlotID&0xc)>>2)
+	buf[3] = uint8((h.SlotID&0x3)<<6) | uint8((h.StreamID&0xfc)>>2)
+	buf[4] = uint8((h.StreamID&0x3)<<6) | uint8(0)
+	buf[5] = uint8((h.SequenceID & 0xff0) >> 4)
+	buf[6] = uint8((h.SequenceID&0xf)<<4) | uint8((h.Length&0xf00)>>8)
+	buf[7] = uint8((h.Length) & 0xff)
+	binary.LittleEndian.PutUint64(buf[8:16], h.Timestamp)
+	return nil
 }
 
 // Serialize MpdEventHeader
@@ -127,6 +155,14 @@ func (h *MpdMStreamHeader) Serialize(buf []byte) error {
 
 // SerializeTo serializes the Mpd layer into bytes and writes the bytes to the SerializeBuffer
 func (mpd *MpdLayer) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) error {
+	if mpd.MpdInventoryHeader != nil {
+		inventoryHeaderBytes, err := b.AppendBytes(16)
+		if err != nil {
+			return err
+		}
+		mpd.MpdInventoryHeader.Serialize(inventoryHeaderBytes)
+	}
+
 	timestampHeaderBytes, err := b.AppendBytes(16)
 	if err != nil {
 		return err

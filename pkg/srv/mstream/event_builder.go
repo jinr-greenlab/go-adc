@@ -17,6 +17,7 @@ package mstream
 import (
 	"github.com/google/gopacket"
 
+	"jinr.ru/greenlab/go-adc/pkg/config"
 	"jinr.ru/greenlab/go-adc/pkg/layers"
 	"jinr.ru/greenlab/go-adc/pkg/log"
 	"jinr.ru/greenlab/go-adc/pkg/srv"
@@ -28,7 +29,8 @@ const (
 
 type EventBuilder struct {
 	id              int
-	deviceName      string
+	cfg             *config.Config
+	device          *config.Device
 	Free            bool
 	DeviceSerial    uint32
 	EventNum        uint32
@@ -47,10 +49,11 @@ type EventBuilder struct {
 }
 
 // NewEvent ...
-func NewEventBuilder(id int, deviceName string, writerCh chan<- []byte, seq <-chan uint32) *EventBuilder {
+func NewEventBuilder(id int, cfg *config.Config, device *config.Device, writerCh chan<- []byte, seq <-chan uint32) *EventBuilder {
 	return &EventBuilder{
 		id:              id,
-		deviceName:      deviceName,
+		cfg:             cfg,
+		device:          device,
 		Free:            true,
 		DeviceSerial:    0,
 		EventNum:        0,
@@ -92,7 +95,7 @@ func (b *EventBuilder) CloseEvent(persist bool) {
 	defer b.Clear()
 
 	if b.Trigger == nil {
-		log.Error("Can not close event w/o trigger: %s event: %d", b.deviceName, b.EventNum)
+		log.Error("Can not close event w/o trigger: %s event: %d", b.device.Name, b.EventNum)
 		return
 	}
 	//log.Info("Close event: %s event: %d\n"+
@@ -107,10 +110,37 @@ func (b *EventBuilder) CloseEvent(persist bool) {
 	// Total data length is the total length of all data fragments + total length of all MpdMStreamHeader headers
 	// data length + (num data fragments + one trigger fragment) * MStream header size
 	deviceHeaderLength := b.Length + (dataCount+1)*4
-	// + 8 bytes (which is the size of MpdDeviceHeader)
+	// + 8 bytes MpdDeviceHeader
 	eventHeaderLength := deviceHeaderLength + 8
+	// + 12 bytes MpdEventHeader
+	// + 16 bytes MpdTimestampHeader
+	// + 16 bytes MpdInventoryHeader
+	inventoryHeaderLength := eventHeaderLength + 12 + 16 + 16
+	if inventoryHeaderLength%64 != 0 {
+		panic("Inventory header error: Data length is not multiple of 64")
+	}
+	if inventoryHeaderLength/64 > 0xffff {
+		panic("Inventory header error: Data length is more than 2^16 * 64")
+	}
+
+	var mpdInventoryHeader *layers.MpdInventoryHeader = nil
+	if b.cfg.Inventory != nil && b.device.DeviceInventory != nil {
+		mpdInventoryHeader = &layers.MpdInventoryHeader{
+			Version:    b.cfg.Inventory.Version,
+			DetectorID: b.cfg.Inventory.DetectorID,
+			CrateID:    b.device.DeviceInventory.CrateID,
+			SlotID:     b.device.DeviceInventory.SlotID,
+			StreamID:   0,
+			Reserved:   0,
+			// sequenceID takes 12 bits in the inventory header
+			SequenceID: uint16(b.EventNum % 0xfff),
+			Length:     uint16(inventoryHeaderLength / 64),
+			Timestamp:  uint64(b.Trigger.TaiSec<<30) | uint64(b.Trigger.TaiNSec&0x3fffffff),
+		}
+	}
 
 	mpd := &layers.MpdLayer{
+		MpdInventoryHeader: mpdInventoryHeader,
 		MpdTimestampHeader: &layers.MpdTimestampHeader{
 			Sync:      layers.MpdTimestampMagic,
 			Length:    8,
@@ -134,7 +164,7 @@ func (b *EventBuilder) CloseEvent(persist bool) {
 	opts := gopacket.SerializeOptions{}
 	err := gopacket.SerializeLayers(buf, opts, mpd)
 	if err != nil {
-		log.Error("Error while serializing Mpd layer: %s, event: %d", b.deviceName, b.EventNum)
+		log.Error("Error while serializing Mpd layer: %s, event: %d", b.device.Name, b.EventNum)
 		return
 	}
 
@@ -173,7 +203,7 @@ func (b *EventBuilder) SetFragment(f *layers.MStreamFragment) {
 
 func (b *EventBuilder) Run() {
 	b.EventNum = <-b.seq
-	log.Info("Run EventBuilder: %s id: %d", b.deviceName, b.id)
+	log.Info("Run EventBuilder: %s id: %d", b.device.Name, b.id)
 	for {
 		f := <-b.DefragmentedCh
 		if f.MStreamPayloadHeader.EventNum >= b.EventNum+NumEventBuildersPerManager {
@@ -193,24 +223,26 @@ func (b *EventBuilder) Run() {
 }
 
 type EventBuilderManager struct {
-	deviceName     string
+	cfg            *config.Config
+	device         *config.Device
 	eventBuilders  []*EventBuilder
 	writerCh       chan<- []byte
 	defragmentedCh <-chan *layers.MStreamFragment
 	seq            chan uint32
 }
 
-func NewEventBuilderManager(deviceName string, defragmentedCh <-chan *layers.MStreamFragment, writerCh chan<- []byte) *EventBuilderManager {
+func NewEventBuilderManager(cfg *config.Config, device *config.Device, defragmentedCh <-chan *layers.MStreamFragment, writerCh chan<- []byte) *EventBuilderManager {
 	//log.Info("Creating EventBuilderManager: %s", deviceName)
 	return &EventBuilderManager{
-		deviceName:     deviceName,
+		cfg:            cfg,
+		device:         device,
 		writerCh:       writerCh,
 		defragmentedCh: defragmentedCh,
 	}
 }
 
 func (m *EventBuilderManager) Run() {
-	log.Info("Run EventBuilderManger: %s", m.deviceName)
+	log.Info("Run EventBuilderManger: %s", m.device.Name)
 	m.seq = make(chan uint32)
 
 	go func(seq chan uint32) {
@@ -224,7 +256,7 @@ func (m *EventBuilderManager) Run() {
 	m.eventBuilders = []*EventBuilder{}
 	for i := 0; i < NumEventBuildersPerManager; i++ {
 		//log.Info("Creating EventBuilder: %s id: %d", m.deviceName, i)
-		b := NewEventBuilder(i, m.deviceName, m.writerCh, m.seq)
+		b := NewEventBuilder(i, m.cfg, m.device, m.writerCh, m.seq)
 		m.eventBuilders = append(m.eventBuilders, b)
 		go func(eventBuilder *EventBuilder) {
 			eventBuilder.Run()
