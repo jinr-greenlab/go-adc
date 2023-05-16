@@ -109,7 +109,7 @@ func (s *MStreamServer) Run() error {
 			return errResolve
 		}
 		defragManager := NewDefragManager(deviceName, s.fragmentedChs[deviceName], s.defragmentedChs[deviceName])
-		eventBuilderManager := NewEventBuilderManager(deviceName, s.defragmentedChs[deviceName], s.writerChs[deviceName])
+		eventBuilderManager := NewEventBuilderManager(s.Config, device, s.defragmentedChs[deviceName], s.writerChs[deviceName])
 
 		// Run mpd writers
 		go func(writerStateCh <-chan string, writerCh <-chan []byte) {

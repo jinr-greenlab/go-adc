@@ -15,12 +15,18 @@
 package config
 
 const (
-	ConfigDir            = ".go-adc"
-	ConfigFile           = "config"
-	DBFile               = "db.bolt"
-	DiscoverDBFile       = "discoverdb.bolt"
-	DefaultDiscoverIP    = "239.192.1.1"
-	DefaultDiscoverIface = "eth0"
-	DefaultIP            = "192.168.1.100"
-	DefaultLogLevel      = "info"
+	ConfigDir                     = ".go-adc"
+	ConfigFile                    = "config"
+	DBFile                        = "db.bolt"
+	DiscoverDBFile                = "discoverdb.bolt"
+	DefaultDiscoverIP             = "239.192.1.1"
+	DefaultDiscoverIface          = "eth0"
+	DefaultIP                     = "192.168.1.100"
+	DefaultDeviceName             = "device_0"
+	DefaultDeviceIP               = "192.168.1.101"
+	DefaultDeviceInventoryCrateID = 0
+	DefaultDeviceInventorySlotID  = 0
+	DefaultInventoryVersion       = 0
+	DefaultInventoryDetectorID    = 0
+	DefaultLogLevel               = "info"
 )
