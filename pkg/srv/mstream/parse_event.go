@@ -187,6 +187,9 @@ func BuildStructToApi(Ev MstreamHeader, EventNumber uint32) RepeatToApi {
 	RepeatToApi.EventNumber = EventNumber
 	RepeatToApi.Timestamp = Ev.EventTimestamp
 	for _, c := range Ev.MStreamDataHeader {
+		if c.ADCData.Voltage == nil {
+			continue
+		}
 		ChannelVoltage := ChannelVoltage{}
 		ChannelVoltage.Channel = c.Channel
 		ChannelVoltage.Voltage = c.ADCData.Voltage
