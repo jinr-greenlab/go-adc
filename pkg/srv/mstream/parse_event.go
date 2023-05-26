@@ -71,7 +71,7 @@ type AdcData struct {
 
 type RepeatToApi struct {
 	EventNumber    uint32
-	Timestamp      uint32
+	Timestamp      uint64
 	ChannelVoltage []ChannelVoltage
 }
 
@@ -185,7 +185,7 @@ func NewMstreamHeader(d []byte) MstreamHeader {
 func BuildStructToApi(Ev MstreamHeader, EventNumber uint32) RepeatToApi {
 	RepeatToApi := RepeatToApi{}
 	RepeatToApi.EventNumber = EventNumber
-	RepeatToApi.Timestamp = Ev.EventTimestamp
+	RepeatToApi.Timestamp = uint64(Ev.EventTimestamp)*1000000000 + uint64(Ev.Tainsec)
 	for _, c := range Ev.MStreamDataHeader {
 		if c.ADCData.Voltage == nil {
 			continue
