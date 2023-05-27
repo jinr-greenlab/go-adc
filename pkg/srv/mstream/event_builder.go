@@ -74,9 +74,9 @@ func (b *EventBuilder) HandleFragment(f *layers.MStreamFragment) {
 
 	select {
 	case <-b.lastEventCh:
-		b.lastEventCh <- LastEvent{f.MStreamPayloadHeader.EventNum, f.Data}
+		b.lastEventCh <- LastEvent{f.MStreamPayloadHeader.EventNum, f.MStreamData.Bytes}
 	default:
-		b.lastEventCh <- LastEvent{f.MStreamPayloadHeader.EventNum, f.Data}
+		b.lastEventCh <- LastEvent{f.MStreamPayloadHeader.EventNum, f.MStreamData.Bytes}
 	}
 
 	b.writerCh <- buf.Bytes()
