@@ -3,6 +3,7 @@ package mstream
 import (
 	"encoding/binary"
 	"encoding/json"
+	"sort"
 
 	"jinr.ru/greenlab/go-adc/pkg/log"
 )
@@ -72,6 +73,7 @@ type AdcData struct {
 type RepeatToApi struct {
 	EventNumber    uint32
 	Timestamp      uint64
+	Samples        int
 	ChannelVoltage []ChannelVoltage
 }
 
@@ -196,6 +198,11 @@ func BuildStructToApi(Ev MstreamHeader, EventNumber uint32) RepeatToApi {
 		RepeatToApi.ChannelVoltage = append(RepeatToApi.ChannelVoltage, ChannelVoltage)
 	}
 
+	RepeatToApi.Samples = len(RepeatToApi.ChannelVoltage[0].Voltage)
+
+	sort.Slice(RepeatToApi.ChannelVoltage, func(i, j int) bool {
+		return RepeatToApi.ChannelVoltage[i].Channel < RepeatToApi.ChannelVoltage[j].Channel
+	})
 	return RepeatToApi
 }
 
