@@ -9,7 +9,7 @@ swagger:
 
 DOCKER_IMAGE := quay.io/kozhukalov/go-adc
 TIMESTAMP ?= $(shell date +%Y%m%d%H%M%S)
-COMMIT    ?= $(shell git rev-parse HEAD)
+COMMIT    ?= $(shell git log -1 --pretty=%h)
 
 docker-build:
 	docker build --rm -t go-adc:tqdc .
