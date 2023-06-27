@@ -1,0 +1,32 @@
+ADC64VE-V3-XG 1.5
+
+Commit 1.5-0-ge69c9b2 on 02.05.2023
+Build by jenkins on 02.05.2023
+SDB checksum correct
+
+
+first_addr-last_addr
+                   first_addr-last_addr / 2
+                               device_id
+                                          device_name          version
+00000080-000000bf | 0040-005f | 41a37c29 | MLink-CSR           1.0 | +
+00000100-0000013f | 0080-009f | e5ea34bf | WR Status           1.0 | +
+000002c0-000002df | 0160-016f | dd07b826 | ads52j90_spi        1.0 | +
+00000700-0000077f | 0380-03bf | e89b0a06 | board_mgmt_regs     1.0 |
+00000780-000007ff | 03c0-03ff | 2e0160f8 | lemo_control_regs   1.0 | +
+00002000-0000203f | 1000-101f | f4da37e8 | Run Logic           1.0 | +
+00002200-000023ff | 1100-11ff | 7477e01e | Waveform Recorder   2.0 | +
+00002400-000025ff | 1200-12ff | 76b80b88 | Trigger Control     1.0 | +
+00002600-000027ff | 1300-13ff | 510dbe12 | Trigger Info        1.0 | +
+00002800-0000281f | 1400-140f | 2fc0a72a | zs regs             1.0 | +
+00002a00-00002a1f | 1500-150f | a5fd23ba | erc_regs            1.0 | +
+00003000-000033ff | 1800-19ff | c32e925e | BLC                 1.1 | +
+00003400-000035ff | 1a00-1aff | 3d1ca270 | Waveform Trig       1.0 | +
+00008000-000081ff | 4000-40ff | 47567e3c | MCU                 2.0 | +
+0000a000-0000a0ff | 5000-507f | 371a0421 | FELink-CSR          1.0 | +
+0000e000-0000e1ff | 7000-70ff | 6e0f7007 | Flash               2.0 | +
+0000e400-0000e7ff | 7200-73ff | e050724f | SFP0 Eth Port       1.0 | +
+0000e800-0000e83f | 7400-741f | 3efb27ee | Deserializers Contr 1.0 | +
+0000e880-0000e8bf | 7440-745f | 286e09bb | ADC Pattern Test    1.0 | +
+0000f800-0000ffff | 7c00-7fff | 9d754a61 | SDB                 1.1 |
+
