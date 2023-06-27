@@ -107,21 +107,25 @@ func (b *EventBuilder) CloseEvent(persist bool) {
 	}
 
 	dataCount := countDataFragments(b.DataChannels)
-	// Total data length is the total length of all data fragments + total length of all MpdMStreamHeader headers
-	// data length + (num data fragments + one trigger fragment) * MStream header size
+	// Total data length is the total length of all data fragments (including trigger fragment)
+	// + total length of all MpdMStreamHeader headers
+	// I.e.
+	// data length + (num data fragments + one trigger fragment) * MpdMStreamHeader header size
 	deviceHeaderLength := b.Length + (dataCount+1)*4
 	// + 8 bytes MpdDeviceHeader
 	eventHeaderLength := deviceHeaderLength + 8
 	// + 12 bytes MpdEventHeader
 	// + 16 bytes MpdTimestampHeader
 	// + 16 bytes MpdInventoryHeader
-	inventoryHeaderLength := eventHeaderLength + 12 + 16 + 16
-	if inventoryHeaderLength%64 != 0 {
-		panic("Inventory header error: Data length is not multiple of 64")
+	inventoryHeaderLengthInBytes := eventHeaderLength + 12 + 16 + 16
+	inventoryHeaderLength := inventoryHeaderLengthInBytes / 8
+	if inventoryHeaderLengthInBytes%8 != 0 {
+		inventoryHeaderLength += 1
 	}
-	if inventoryHeaderLength/64 > 0xffff {
-		panic("Inventory header error: Data length is more than 2^16 * 64")
+	if inventoryHeaderLength > 0xffff {
+		panic("Inventory header error: Data length is more than 512K")
 	}
+	// log.Info("TaiSec: %d TaiNSec: %d", b.Trigger.TaiSec, b.Trigger.TaiNSec)
 
 	var mpdInventoryHeader *layers.MpdInventoryHeader = nil
 	if b.cfg.Inventory != nil && b.device.DeviceInventory != nil {
@@ -134,8 +138,8 @@ func (b *EventBuilder) CloseEvent(persist bool) {
 			Reserved:   0,
 			// sequenceID takes 12 bits in the inventory header
 			SequenceID: uint16(b.EventNum % 0xfff),
-			Length:     uint16(inventoryHeaderLength / 64),
-			Timestamp:  uint64(b.Trigger.TaiSec<<30) | uint64(b.Trigger.TaiNSec&0x3fffffff),
+			Length:     uint16(inventoryHeaderLength),
+			Timestamp:  uint64(b.Trigger.TaiSec)*1000000000 + uint64(b.Trigger.TaiNSec&0x3fffffff),
 		}
 	}
 

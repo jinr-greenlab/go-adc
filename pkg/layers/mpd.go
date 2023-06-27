@@ -57,11 +57,16 @@ type MpdInventoryHeader struct {
 	DetectorID uint8  // 6 bits
 	CrateID    uint16 // 10 bits
 	SlotID     uint8  // 4 bits
-	StreamID   uint8  // 8 bits // always 0 for our case since we have 1 data stream per slot/device
-	Reserved   uint8  // 6 bits // not used at this point
-	SequenceID uint16 // 12 bits // data block sequence number, in our case it can be event number
-	Length     uint16 // 12 bits // data block length in 64-bit words
-	Timestamp  uint64 // this is the event precise timestamp taken from WR
+	// always 0 for our case since we have 1 data stream per slot/device
+	StreamID uint8 // 8 bits
+	// not used at this point
+	Reserved uint8 // 6 bits
+	// data block sequence number, in our case it can be event number
+	SequenceID uint16 // 12 bits
+	// data block length (including inventory header itself) in 64-bit words, max is 65536 words or 512Kb
+	Length uint16 // 12 bits
+	// this is the event precise timestamp taken from WR (from trigger fragment)
+	Timestamp uint64
 }
 
 // lib-common/MpdRawTypes.h

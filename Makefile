@@ -12,12 +12,12 @@ TIMESTAMP ?= $(shell date +%Y%m%d%H%M%S)
 COMMIT    ?= $(shell git log -1 --pretty=%h)
 
 docker-build:
-	docker build --rm -t go-adc:adc64 .
+	docker build --rm -t go-adc:adc64_sdb .
 
 docker-pub:
-	docker tag go-adc:adc64 ${DOCKER_IMAGE}:adc64
-	docker tag go-adc:adc64 ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
-	@echo docker push ${DOCKER_IMAGE}:adc64
+	docker tag go-adc:adc64_sdb ${DOCKER_IMAGE}:adc64_sdb
+	docker tag go-adc:adc64_sdb ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
+	@echo docker push ${DOCKER_IMAGE}:adc64_sdb
 	@echo docker push ${DOCKER_IMAGE}:${COMMIT}-${TIMESTAMP}
 
 # linting
